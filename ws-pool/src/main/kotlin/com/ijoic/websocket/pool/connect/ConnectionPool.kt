@@ -17,16 +17,14 @@
  */
 package com.ijoic.websocket.pool.connect
 
-import okhttp3.*
-
 /**
  * WebSocket connection pool
  *
  * @author verstiu created at 2019-01-22 11:34
  */
-internal class ConnectionPool(private val url: String) {
-
-  private val client = OkHttpClient()
+internal class ConnectionPool(
+  private val url: String,
+  private val createConnection: () -> Connection = { ConnectionImpl() }) {
 
   private val activeConnections = mutableListOf<Connection>()
   private val prepareConnections = mutableListOf<Connection>()
@@ -46,17 +44,16 @@ internal class ConnectionPool(private val url: String) {
   }
 
   private fun prepareConnection() {
-    val connection = Connection()
+    val connection = createConnection()
 
     connection.prepare(
-      client,
       url,
       onActive = {
         prepareConnections.remove(connection)
         activeConnections.add(connection)
         notifyConnectionActive(connection)
       },
-      onInActive = {
+      onInactive = {
         activeConnections.remove(connection)
         prepareConnections.add(connection)
         notifyConnectionInactive(connection)
