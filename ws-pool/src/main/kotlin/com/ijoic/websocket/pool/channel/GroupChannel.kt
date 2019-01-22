@@ -22,7 +22,7 @@ package com.ijoic.websocket.pool.channel
  *
  * @author verstsiu created at 2019-01-22 11:35
  */
-internal interface GroupChannel {
+interface GroupChannel {
   /**
    * Add [message]
    */

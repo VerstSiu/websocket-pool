@@ -22,7 +22,7 @@ package com.ijoic.websocket.pool.connect
  *
  * @author verstiu created at 2019-01-22 11:34
  */
-internal class ConnectionPool(
+class ConnectionPool(
   private val url: String,
   private val createConnection: () -> Connection = { ConnectionImpl() }) {
 
@@ -32,7 +32,7 @@ internal class ConnectionPool(
   /**
    * Request connections with [size]
    */
-  fun requestConnections(size: Int) {
+  internal fun requestConnections(size: Int) {
     val prepareSize = size - prepareConnections.size
 
     if (prepareSize <= 0) {
@@ -65,7 +65,7 @@ internal class ConnectionPool(
   /**
    * Returns min load active connection or null
    */
-  fun getMinLoadActiveConnection(): Connection? {
+  internal fun getMinLoadActiveConnection(): Connection? {
     // TODO
     return activeConnections.firstOrNull()
   }
@@ -87,14 +87,14 @@ internal class ConnectionPool(
   /**
    * Add connection change [listener]
    */
-  fun addConnectionChangeListener(listener: ConnectionChangedListener) {
+  internal fun addConnectionChangeListener(listener: ConnectionChangedListener) {
     connectionListeners.add(listener)
   }
 
   /**
    * Remove connection change [listener]
    */
-  fun removeConnectionChangeListener(listener: ConnectionChangedListener) {
+  internal fun removeConnectionChangeListener(listener: ConnectionChangedListener) {
     connectionListeners.remove(listener)
   }
 
@@ -109,7 +109,7 @@ internal class ConnectionPool(
   /**
    * Connection changed listener
    */
-  interface ConnectionChangedListener {
+  internal interface ConnectionChangedListener {
     /**
      * [connection] active
      */

@@ -24,7 +24,7 @@ import com.ijoic.websocket.pool.handler.MessageHandler
  *
  * @author verstsiu created at 2019-01-22 11:33
  */
-internal interface Connection {
+interface Connection {
 
   /**
    * Prepare connection with [url], [onActive] callback and [onInactive] callback

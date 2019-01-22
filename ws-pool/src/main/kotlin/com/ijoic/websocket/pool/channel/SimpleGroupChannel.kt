@@ -26,7 +26,7 @@ import com.ijoic.websocket.pool.handler.MessageHandler
  *
  * @author verstsiu created at 2019-01-22 11:37
  */
-internal class SimpleGroupChannel(
+class SimpleGroupChannel(
   private val pool: ConnectionPool,
   private val handler: MessageHandler
 ) : GroupChannel {

@@ -22,7 +22,7 @@ package com.ijoic.websocket.pool.handler
  *
  * @author verstsiu created at 2019-01-22 16:09
  */
-internal interface MessageHandler {
+interface MessageHandler {
   /**
    * Dispatch [bytes] message
    */
