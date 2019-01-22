@@ -1,0 +1,3 @@
+rootProject.name = 'websocket-pool'
+include 'sample'
+include 'ws-pool'
