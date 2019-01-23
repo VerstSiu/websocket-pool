@@ -30,32 +30,27 @@ internal class LimitIntervalPrepareManager(
 
   private var lastPrepareTime = 0L
 
-  private var prepareBusy = false
-  private var waitBusy = false
+  private var prepareSize = 0
   private var waitSize = 0
+  private var waitBusy = false
 
   override fun onRequestConnections(size: Int) {
-    if (prepareBusy) {
-      val oldRequestSize = waitSize + 1
+    val oldRequestSize = prepareSize + waitSize
+    val appendSize = size - oldRequestSize
 
-      if (oldRequestSize >= size) {
-        return
-      }
-      waitSize += size - oldRequestSize
+    if (appendSize <= 0) {
+      return
+    }
+    waitSize += appendSize
 
-    } else {
-      if (waitSize < size) {
-        waitSize = size
-      }
-      if (!waitBusy) {
-        val currTime = getCurrTime()
+    if (!waitBusy) {
+      val currTime = getCurrTime()
 
-        if (lastPrepareTime <= 0 || currTime - lastPrepareTime > interval) {
-          doConnectionPrepare()
-        } else {
-          waitBusy = true
-          scheduleDelay(interval - (currTime - lastPrepareTime), this::checkoutConnectionPrepare)
-        }
+      if (lastPrepareTime <= 0 || currTime - lastPrepareTime > interval) {
+        doConnectionPrepare()
+      } else {
+        waitBusy = true
+        scheduleDelay(interval - (currTime - lastPrepareTime), this::checkoutConnectionPrepare)
       }
     }
   }
@@ -64,17 +59,17 @@ internal class LimitIntervalPrepareManager(
     if (waitBusy) {
       return
     }
+    --prepareSize
 
     if (waitSize <= 0) {
-      prepareBusy = false
       return
     }
     doConnectionPrepare()
   }
 
   private fun doConnectionPrepare() {
-    prepareBusy = true
     lastPrepareTime = getCurrTime()
+    ++prepareSize
     --waitSize
 
     onPrepare()
@@ -92,7 +87,7 @@ internal class LimitIntervalPrepareManager(
   private fun onCheckoutConnectionPrepare() {
     waitBusy = false
 
-    if (prepareBusy || waitSize <= 0) {
+    if (waitSize <= 0) {
       return
     }
     doConnectionPrepare()
