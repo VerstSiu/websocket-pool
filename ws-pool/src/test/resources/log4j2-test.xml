@@ -9,6 +9,9 @@
         <Logger name="com.ijoic.websocket.pool.connect.ConnectionImpl" level="debug" additivity="false">
             <AppenderRef ref="Console"/>
         </Logger>
+        <Logger name="com.ijoic.websocket.pool.connect.pool.ConnectionPool" level="trace" additivity="false">
+            <AppenderRef ref="Console"/>
+        </Logger>
         <Root level="error">
             <AppenderRef ref="Console"/>
         </Root>

@@ -43,6 +43,15 @@ abstract class BasePrepareManager: PrepareManager {
     }
   }
 
+  override fun appendConnections(size: Int) {
+    if (size <= 0) {
+      return
+    }
+    syncEdit {
+      onRequestConnections(size)
+    }
+  }
+
   override fun notifyPrepareComplete() {
     syncEdit(this::onPrepareComplete)
   }

@@ -15,36 +15,18 @@
  *  limitations under the License.
  *
  */
-package com.ijoic.websocket.pool.connect.prepare
+package com.ijoic.websocket.pool.connect.pool
+
+import org.junit.Test
 
 /**
- * Prepare manager
+ * Connection pool test
  *
- * @author verstsiu created at 2019-01-23 10:56
+ * @author verstsiu created at 2019-01-23 16:52
  */
-internal interface PrepareManager {
-  /**
-   * Request connection size
-   */
-  val requestSize: Int
-
-  /**
-   * Request connections with [size]
-   */
-  fun requestConnections(size: Int)
-
-  /**
-   * Append connections with [size]
-   */
-  fun appendConnections(size: Int)
-
-  /**
-   * Notify prepare complete
-   */
-  fun notifyPrepareComplete()
-
-  /**
-   * Destroy manager
-   */
-  fun destroy()
+class ConnectionPoolTest {
+  @Test
+  fun testRetryRecovery() {
+    // TODO add implement codes
+  }
 }

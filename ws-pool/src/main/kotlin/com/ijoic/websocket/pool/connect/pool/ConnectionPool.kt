@@ -113,10 +113,10 @@ class ConnectionPool(
   private fun onChildConnectionInactive(connection: Connection) {
     if (activeConnections.remove(connection)) {
       --metrics.activeSize
-      prepareManager.notifyPrepareComplete()
+      ++metrics.requestSize
     }
     if (prepareConnections.remove(connection)) {
-      ++metrics.requestSize
+      prepareManager.notifyPrepareComplete()
     }
     connection.destroy()
 
@@ -124,6 +124,9 @@ class ConnectionPool(
       retryBusy -> {
         ++retryCount
         scheduleRetryConnection()
+      }
+      !activeConnections.isEmpty() -> {
+        prepareManager.appendConnections(1)
       }
       prepareManager.requestSize <= 0 && metrics.requestSize > 0 -> {
         retryBusy = true
@@ -140,15 +143,15 @@ class ConnectionPool(
     if (delayMs <= 0) {
       onRetryConnection()
     } else {
+      logger.trace("schedule retry $retryCount after $delayMs ms")
       scheduleDelay(delayMs) {
         syncEdit { onRetryConnection() }
       }
     }
-    logger.debug("retry connection $retryCount with $url")
   }
 
   private fun onRetryConnection() {
-    --metrics.requestSize
+    logger.debug("retry $retryCount with $url")
     prepareManager.requestConnections(1)
   }
 
