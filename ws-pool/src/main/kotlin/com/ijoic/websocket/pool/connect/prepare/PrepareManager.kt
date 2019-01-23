@@ -24,6 +24,11 @@ package com.ijoic.websocket.pool.connect.prepare
  */
 internal interface PrepareManager {
   /**
+   * Request connection size
+   */
+  val requestSize: Int
+
+  /**
    * Request connections with [size]
    */
   fun requestConnections(size: Int)

@@ -29,13 +29,10 @@ internal class LimitSizePrepareManager(
   private var prepareSize = 0
   private var waitSize = 0
 
-  override fun onRequestConnections(size: Int) {
-    val oldRequestSize = prepareSize + waitSize
-    val appendSize = size - oldRequestSize
+  override val requestSize: Int
+    get() = prepareSize + waitSize
 
-    if (appendSize <= 0) {
-      return
-    }
+  override fun onRequestConnections(appendSize: Int) {
     when {
       waitSize > 0 -> {
         waitSize += appendSize

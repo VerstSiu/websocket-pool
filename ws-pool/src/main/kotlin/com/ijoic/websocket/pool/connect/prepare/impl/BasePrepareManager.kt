@@ -33,7 +33,14 @@ abstract class BasePrepareManager: PrepareManager {
     if (size <= 0) {
       return
     }
-    syncEdit { onRequestConnections(size) }
+    syncEdit {
+      val oldRequestSize = requestSize
+      val appendSize = size - oldRequestSize
+
+      if (appendSize > 0) {
+        onRequestConnections(appendSize)
+      }
+    }
   }
 
   override fun notifyPrepareComplete() {
@@ -45,9 +52,9 @@ abstract class BasePrepareManager: PrepareManager {
   }
 
   /**
-   * Request connections with positive [size]
+   * Request connections with positive [appendSize]
    */
-  protected abstract fun onRequestConnections(size: Int)
+  protected abstract fun onRequestConnections(appendSize: Int)
 
   /**
    * Prepare complete

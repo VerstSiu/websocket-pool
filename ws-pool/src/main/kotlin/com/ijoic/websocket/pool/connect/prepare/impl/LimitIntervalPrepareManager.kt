@@ -34,13 +34,10 @@ internal class LimitIntervalPrepareManager(
   private var waitSize = 0
   private var waitBusy = false
 
-  override fun onRequestConnections(size: Int) {
-    val oldRequestSize = prepareSize + waitSize
-    val appendSize = size - oldRequestSize
+  override val requestSize: Int
+    get() = prepareSize + waitSize
 
-    if (appendSize <= 0) {
-      return
-    }
+  override fun onRequestConnections(appendSize: Int) {
     waitSize += appendSize
 
     if (!waitBusy) {

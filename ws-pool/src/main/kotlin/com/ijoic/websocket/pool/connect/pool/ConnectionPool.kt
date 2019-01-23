@@ -23,6 +23,7 @@ import com.ijoic.websocket.pool.connect.prepare.PrepareManager
 import com.ijoic.websocket.pool.connect.prepare.impl.LimitIntervalPrepareManager
 import com.ijoic.websocket.pool.connect.prepare.impl.LimitSizePrepareManager
 import com.ijoic.websocket.pool.util.AppExecutors
+import org.apache.logging.log4j.LogManager
 import java.util.concurrent.TimeUnit
 
 /**
@@ -46,35 +47,116 @@ class ConnectionPool(
   }
 
   private val prepareManager = this.config.toPrepareManager()
+  private val metrics = ConnectionMetrics()
+
+  private var retryCount = 0
+  private var retryBusy = false
+
+  private var poolActive = true
+  private val editLock = Object()
 
   /**
    * Request connections with [size]
    */
   fun requestConnections(size: Int) {
-    prepareManager.requestConnections(size)
+    syncEdit { onRequestConnections(size) }
+  }
+
+  private fun onRequestConnections(size: Int) {
+    if (retryBusy) {
+      val oldRequestSize = metrics.requestSize + 1
+
+      if (size > oldRequestSize) {
+        metrics.requestSize = size - 1
+      }
+    } else {
+      prepareManager.requestConnections(size)
+      metrics.requestSize = prepareManager.requestSize
+    }
   }
 
   private fun prepareConnection() {
+    syncEdit(this::onPrepareConnection)
+  }
+
+  private fun onPrepareConnection() {
     val connection = createConnection()
 
     connection.prepare(
       url,
       onActive = {
-        if (prepareConnections.remove(connection)) {
-          prepareManager.notifyPrepareComplete()
-        }
-        activeConnections.add(connection)
-        notifyConnectionActive(connection)
+        syncEdit { onChildConnectionActive(connection) }
       },
       onInactive = {
-        if (activeConnections.remove(connection)) {
-          prepareManager.notifyPrepareComplete()
-        }
-        prepareConnections.add(connection)
-        notifyConnectionInactive(connection)
+        syncEdit { onChildConnectionInactive(connection) }
       }
     )
     prepareConnections.add(connection)
+  }
+
+  private fun onChildConnectionActive(connection: Connection) {
+    if (prepareConnections.remove(connection)) {
+      --metrics.requestSize
+      ++metrics.activeSize
+      prepareManager.notifyPrepareComplete()
+    }
+    activeConnections.add(connection)
+
+    if (retryBusy) {
+      retryBusy = false
+      retryCount = 0
+      prepareManager.requestConnections(metrics.requestSize)
+    }
+    notifyConnectionActive(connection)
+  }
+
+  private fun onChildConnectionInactive(connection: Connection) {
+    if (activeConnections.remove(connection)) {
+      --metrics.activeSize
+      prepareManager.notifyPrepareComplete()
+    }
+    if (prepareConnections.remove(connection)) {
+      ++metrics.requestSize
+    }
+    connection.destroy()
+
+    when {
+      retryBusy -> {
+        ++retryCount
+        scheduleRetryConnection()
+      }
+      prepareManager.requestSize <= 0 && metrics.requestSize > 0 -> {
+        retryBusy = true
+        scheduleRetryConnection()
+      }
+    }
+    notifyConnectionInactive(connection)
+  }
+
+  private fun scheduleRetryConnection() {
+    val retryIntervals = config.retryIntervals
+    val delayMs = retryIntervals[retryCount % retryIntervals.size].toMillis()
+
+    if (delayMs <= 0) {
+      onRetryConnection()
+    } else {
+      scheduleDelay(delayMs) {
+        syncEdit { onRetryConnection() }
+      }
+    }
+    logger.debug("retry connection $retryCount with $url")
+  }
+
+  private fun onRetryConnection() {
+    --metrics.requestSize
+    prepareManager.requestConnections(1)
+  }
+
+  private fun syncEdit(func: () -> Unit) {
+    if (!poolActive) {
+      return
+    }
+    synchronized(editLock, func)
   }
 
   /**
@@ -89,11 +171,14 @@ class ConnectionPool(
    * Destroy pooled connections
    */
   fun destroy() {
-    prepareConnections.forEach { it.destroy() }
-    prepareConnections.clear()
-    activeConnections.forEach { it.destroy() }
-    activeConnections.clear()
-    prepareManager.destroy()
+    syncEdit {
+      poolActive = false
+      prepareConnections.forEach { it.destroy() }
+      prepareConnections.clear()
+      activeConnections.forEach { it.destroy() }
+      activeConnections.clear()
+      prepareManager.destroy()
+    }
   }
 
   /* -- connection listeners :begin -- */
@@ -159,4 +244,15 @@ class ConnectionPool(
     }
   }
 
+  /**
+   * Connection metrics
+   */
+  private data class ConnectionMetrics(
+    var activeSize: Int = 0,
+    var requestSize: Int = 0
+  )
+
+  companion object {
+    private val logger = LogManager.getLogger(ConnectionPool::class.java)
+  }
 }
