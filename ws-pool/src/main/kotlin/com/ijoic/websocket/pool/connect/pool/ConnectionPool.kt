@@ -15,7 +15,15 @@
  *  limitations under the License.
  *
  */
-package com.ijoic.websocket.pool.connect
+package com.ijoic.websocket.pool.connect.pool
+
+import com.ijoic.websocket.pool.connect.Connection
+import com.ijoic.websocket.pool.connect.ConnectionImpl
+import com.ijoic.websocket.pool.connect.prepare.PrepareManager
+import com.ijoic.websocket.pool.connect.prepare.impl.LimitIntervalPrepareManager
+import com.ijoic.websocket.pool.connect.prepare.impl.LimitSizePrepareManager
+import com.ijoic.websocket.pool.util.AppExecutors
+import java.util.concurrent.TimeUnit
 
 /**
  * WebSocket connection pool
@@ -24,23 +32,26 @@ package com.ijoic.websocket.pool.connect
  */
 class ConnectionPool(
   private val url: String,
-  private val createConnection: () -> Connection = { ConnectionImpl() }) {
+  config: PoolConfig? = null,
+  createConnection: (() -> Connection)? = null,
+  scheduleDelay: ((Long, () -> Unit) -> Unit)? = null) {
 
   private val activeConnections = mutableListOf<Connection>()
   private val prepareConnections = mutableListOf<Connection>()
+
+  private val config = PoolConfig.verify(config)
+  private val createConnection = createConnection ?: { ConnectionImpl() }
+  private val scheduleDelay = scheduleDelay ?: { delayMs, r ->
+    AppExecutors.scheduler.schedule(r, delayMs, TimeUnit.MILLISECONDS)
+  }
+
+  private val prepareManager = this.config.toPrepareManager()
 
   /**
    * Request connections with [size]
    */
   internal fun requestConnections(size: Int) {
-    val prepareSize = size - prepareConnections.size
-
-    if (prepareSize <= 0) {
-      return
-    }
-    repeat(prepareSize) {
-      prepareConnection()
-    }
+    prepareManager.requestConnections(size)
   }
 
   private fun prepareConnection() {
@@ -49,12 +60,16 @@ class ConnectionPool(
     connection.prepare(
       url,
       onActive = {
-        prepareConnections.remove(connection)
+        if (prepareConnections.remove(connection)) {
+          prepareManager.notifyPrepareComplete()
+        }
         activeConnections.add(connection)
         notifyConnectionActive(connection)
       },
       onInactive = {
-        activeConnections.remove(connection)
+        if (activeConnections.remove(connection)) {
+          prepareManager.notifyPrepareComplete()
+        }
         prepareConnections.add(connection)
         notifyConnectionInactive(connection)
       }
@@ -78,6 +93,7 @@ class ConnectionPool(
     prepareConnections.clear()
     activeConnections.forEach { it.destroy() }
     activeConnections.clear()
+    prepareManager.destroy()
   }
 
   /* -- connection listeners :begin -- */
@@ -122,5 +138,25 @@ class ConnectionPool(
   }
 
   /* -- connection listeners :end -- */
+
+  private fun PoolConfig.toPrepareManager(): PrepareManager {
+    val intervalMs = this.limitPrepareInterval
+      ?.toMillis()
+      ?.takeIf { it > 0 }
+
+    return if (intervalMs != null) {
+      LimitIntervalPrepareManager(
+        intervalMs,
+        this@ConnectionPool::prepareConnection,
+        { System.currentTimeMillis() },
+        scheduleDelay
+      )
+    } else {
+      LimitSizePrepareManager(
+        this.limitPrepareSize,
+        this@ConnectionPool::prepareConnection
+      )
+    }
+  }
 
 }

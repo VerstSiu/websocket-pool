@@ -18,7 +18,7 @@
 package com.ijoic.websocket.pool.channel
 
 import com.ijoic.websocket.pool.connect.Connection
-import com.ijoic.websocket.pool.connect.ConnectionPool
+import com.ijoic.websocket.pool.connect.pool.ConnectionPool
 import com.ijoic.websocket.pool.handler.MessageHandler
 
 /**
