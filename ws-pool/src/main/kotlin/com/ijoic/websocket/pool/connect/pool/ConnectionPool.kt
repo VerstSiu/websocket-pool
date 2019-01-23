@@ -50,7 +50,7 @@ class ConnectionPool(
   /**
    * Request connections with [size]
    */
-  internal fun requestConnections(size: Int) {
+  fun requestConnections(size: Int) {
     prepareManager.requestConnections(size)
   }
 
