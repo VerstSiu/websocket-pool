@@ -17,9 +17,44 @@
  */
 package sample.ijoic.websocket.pool
 
+import com.ijoic.data.source.channel.impl.MessageChannel
+import com.ijoic.data.source.context.impl.DefaultExecutorContext
+import com.ijoic.data.source.handler.MessageHandler
+import com.ijoic.data.source.pool.ConnectionPool
+import com.ijoic.data.source.websocket.okhttp.WebSocketConnection
+import com.ijoic.data.source.websocket.okhttp.options.WebSocketOptions
+
 /**
  * Test sample execute entrance
  */
 fun main() {
-  println("Hello World!")
+  val pool = ConnectionPool(
+    createConnection = {
+      WebSocketConnection(
+        WebSocketOptions("wss://echo.websocket.org"),
+        DefaultExecutorContext
+      )
+    },
+    context = DefaultExecutorContext
+  )
+  val handler = TestMessageHandler()
+  val channel = MessageChannel<String>(pool, handler)
+
+  channel.send("Hello World!")
+
+  try {
+    System.`in`.read()
+
+  } catch (t: Throwable) {
+    t.printStackTrace()
+  } finally {
+    pool.release()
+  }
+}
+
+private class TestMessageHandler: MessageHandler {
+  override fun dispatchMessage(message: Any): Boolean {
+    println("receive message: $message")
+    return true
+  }
 }
