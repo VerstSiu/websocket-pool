@@ -34,26 +34,32 @@ class MessageChannel<T>(
   private val cachedMessages = mutableListOf<T>()
   private var bindConnection: Connection? = null
 
+  private val editLock = Object()
+
   private val connectionListener = object: ConnectionPool.ConnectionChangedListener {
     override fun onConnectionActive(connection: Connection) {
-      bindConnection = connection
-      connection.addMessageHandler(handler)
-      val msgItems = cachedMessages.toList()
-      cachedMessages.clear()
+      synchronized(editLock) {
+        bindConnection = connection
+        connection.addMessageHandler(handler)
+        val msgItems = cachedMessages.toList()
+        cachedMessages.clear()
 
-      if (!msgItems.isEmpty()) {
-        msgItems.forEach {
-          if (it != null) {
-            connection.send(it, onError)
+        if (!msgItems.isEmpty()) {
+          msgItems.forEach {
+            if (it != null) {
+              connection.send(it, onError)
+            }
           }
         }
       }
     }
 
     override fun onConnectionInactive(connection: Connection) {
-      if (connection == bindConnection) {
-        bindConnection = null
-        connection.removeMessageHandler(handler)
+      synchronized(editLock) {
+        if (connection == bindConnection) {
+          bindConnection = null
+          connection.removeMessageHandler(handler)
+        }
       }
     }
   }
@@ -62,19 +68,21 @@ class MessageChannel<T>(
    * Send [message]
    */
   fun send(message: T) {
-    if (message == null || sendMessageWithExistConnection(message)) {
-      return
-    }
-    val connection = pool.getActiveConnections(1).firstOrNull()
+    synchronized(editLock) {
+      if (message == null || sendMessageWithExistConnection(message)) {
+        return
+      }
+      val connection = pool.getActiveConnections(1).firstOrNull()
 
-    if (connection == null) {
-      cachedMessages.add(message)
-      pool.addConnectionChangeListener(connectionListener)
-      pool.requestConnections(1)
-    } else {
-      bindConnection = connection
-      connection.addMessageHandler(handler)
-      connection.send(message, onError)
+      if (connection == null) {
+        cachedMessages.add(message)
+        pool.addConnectionChangeListener(connectionListener)
+        pool.requestConnections(1)
+      } else {
+        bindConnection = connection
+        connection.addMessageHandler(handler)
+        connection.send(message, onError)
+      }
     }
   }
 
@@ -93,9 +101,11 @@ class MessageChannel<T>(
   }
 
   override fun release() {
-    cachedMessages.clear()
-    pool.removeConnectionChangeListener(connectionListener)
-    bindConnection?.removeMessageHandler(handler)
-    bindConnection = null
+    synchronized(editLock) {
+      cachedMessages.clear()
+      pool.removeConnectionChangeListener(connectionListener)
+      bindConnection?.removeMessageHandler(handler)
+      bindConnection = null
+    }
   }
 }
