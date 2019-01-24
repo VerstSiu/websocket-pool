@@ -19,6 +19,7 @@ package com.ijoic.data.source.websocket.okhttp
 
 import com.ijoic.data.source.ConnectionListener
 import com.ijoic.data.source.context.ExecutorContext
+import com.ijoic.data.source.context.impl.DefaultExecutorContext
 import com.ijoic.data.source.impl.BaseConnection
 import com.ijoic.data.source.websocket.okhttp.options.WebSocketOptions
 import com.ijoic.data.source.websocket.okhttp.ping.PingManager
@@ -32,7 +33,12 @@ import okio.ByteString
  */
 class WebSocketConnection(
   private val options: WebSocketOptions,
-  context: ExecutorContext): BaseConnection(context) {
+  context: ExecutorContext = DefaultExecutorContext): BaseConnection(context) {
+
+  constructor(url: String, context: ExecutorContext = DefaultExecutorContext): this(
+    WebSocketOptions(url),
+    context
+  )
 
   private var prepareSocket: WebSocket? = null
   private var activeSocket: WebSocket? = null

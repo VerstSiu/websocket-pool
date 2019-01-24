@@ -20,6 +20,7 @@ package com.ijoic.data.source.pool
 import com.ijoic.data.source.Connection
 import com.ijoic.data.source.ConnectionListener
 import com.ijoic.data.source.context.ExecutorContext
+import com.ijoic.data.source.context.impl.DefaultExecutorContext
 import com.ijoic.data.source.pool.prepare.PrepareManager
 import com.ijoic.data.source.pool.prepare.impl.LimitIntervalPrepareManager
 import com.ijoic.data.source.pool.prepare.impl.LimitSizePrepareManager
@@ -35,7 +36,7 @@ import java.util.concurrent.Future
  */
 class ConnectionPool(
   config: PoolConfig? = null,
-  private val context: ExecutorContext,
+  private val context: ExecutorContext = DefaultExecutorContext,
   createConnection: () -> Connection) {
 
   private val activeConnections = mutableListOf<Connection>()
