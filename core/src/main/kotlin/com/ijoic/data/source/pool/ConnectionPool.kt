@@ -100,10 +100,11 @@ class ConnectionPool(
     val connection = connectionFactory.borrowObject()
     val prepareActiveId = this.activeId
     val taskId = "connection - ${connectionId++}"
+    logger.trace("[$taskId] prepare connection")
 
     connection.prepare(object : ConnectionListener {
       override fun onConnectionComplete() {
-        logger.debug("[$taskId] connection complete")
+        logger.trace("[$taskId] connection complete")
 
         if (prepareActiveId != activeId) {
           return
@@ -121,7 +122,7 @@ class ConnectionPool(
       }
 
       override fun onConnectionClosed(message: String?, error: Throwable?) {
-        logger.debug("[$taskId] connection closed - $message", error)
+        logger.trace("[$taskId] connection closed - $message", error)
 
         if (prepareActiveId != activeId) {
           return
