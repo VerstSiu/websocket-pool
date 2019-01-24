@@ -195,7 +195,6 @@ class ConnectionPool(
   }
 
   private fun onRetryConnection() {
-    logger.debug("retry connection $retryCount")
     prepareManager.requestConnections(1)
   }
 
@@ -249,7 +248,7 @@ class ConnectionPool(
   }
 
   private fun notifyConnectionInactive(connection: Connection) {
-    connectionListeners.forEach { it.onConnectionActive(connection) }
+    connectionListeners.forEach { it.onConnectionInactive(connection) }
   }
 
   /**
