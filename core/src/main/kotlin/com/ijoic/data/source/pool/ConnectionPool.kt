@@ -53,6 +53,7 @@ class ConnectionPool(
   private var retryTask: Future<*>? = null
 
   private var activeId = 0
+  private var connectionId = 0
   private val editLock = Object()
 
   /**
@@ -98,9 +99,12 @@ class ConnectionPool(
   private fun onPrepareConnection() {
     val connection = connectionFactory.borrowObject()
     val prepareActiveId = this.activeId
+    val taskId = "connection - ${connectionId++}"
 
     connection.prepare(object : ConnectionListener {
       override fun onConnectionComplete() {
+        logger.debug("[$taskId] connection complete")
+
         if (prepareActiveId != activeId) {
           return
         }
@@ -108,6 +112,8 @@ class ConnectionPool(
       }
 
       override fun onConnectionFailure(error: Throwable?) {
+        logger.error("[$taskId] connection failed", error)
+
         if (prepareActiveId != activeId) {
           return
         }
@@ -115,6 +121,8 @@ class ConnectionPool(
       }
 
       override fun onConnectionClosed(message: String?, error: Throwable?) {
+        logger.debug("[$taskId] connection closed - $message", error)
+
         if (prepareActiveId != activeId) {
           return
         }
