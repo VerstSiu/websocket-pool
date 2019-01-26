@@ -17,12 +17,19 @@
  */
 package com.ijoic.data.source
 
+import org.apache.logging.log4j.LogManager
+import org.apache.logging.log4j.message.SimpleMessage
+
+private val connectionLogger = LogManager.getLogger(Connection::class.java)
+
 /**
  * Send [message] with [errorHandler]
  *
  * @author verstsiu created at 2019-01-24 16:19
  */
 fun Connection.send(message: Any, errorHandler: (Throwable) -> Unit) {
+  connectionLogger.trace { SimpleMessage(message.toString()) }
+
   try {
     send(message)
   } catch (t: Throwable) {
