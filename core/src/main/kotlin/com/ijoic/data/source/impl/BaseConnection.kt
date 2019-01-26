@@ -20,6 +20,8 @@ package com.ijoic.data.source.impl
 import com.ijoic.data.source.Connection
 import com.ijoic.data.source.context.ExecutorContext
 import com.ijoic.data.source.handler.MessageHandler
+import org.apache.logging.log4j.LogManager
+import org.apache.logging.log4j.message.SimpleMessage
 
 /**
  * Base connection
@@ -55,9 +57,25 @@ abstract class BaseConnection(private val context: ExecutorContext): Connection 
    */
   protected fun dispatchReceivedMessage(message: Any) {
     context.io {
-      for (handler in handlerItems) {
-        if (handler.dispatchMessage(message)) {
-          break
+      val oldHandlerItems = this.handlerItems
+
+      if (oldHandlerItems.isEmpty()) {
+        connectionLogger.trace {
+          SimpleMessage("no handler found to dispatch message: $message")
+        }
+      } else {
+        var msgDispatched = false
+
+        for (handler in handlerItems) {
+          if (handler.dispatchMessage(message)) {
+            msgDispatched = true
+            break
+          }
+        }
+        if (!msgDispatched) {
+          connectionLogger.trace {
+            SimpleMessage("message dispatch failed with all handlers (${oldHandlerItems.size}): $message")
+          }
         }
       }
     }
@@ -69,4 +87,8 @@ abstract class BaseConnection(private val context: ExecutorContext): Connection 
   }
 
   protected abstract fun onRelease()
+
+  companion object {
+    private val connectionLogger = LogManager.getLogger(Connection::class.java)
+  }
 }
