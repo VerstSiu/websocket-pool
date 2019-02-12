@@ -27,7 +27,7 @@ import com.ijoic.data.source.send
  *
  * @author verstsiu created at 2019-01-24 15:26
  */
-class MessageChannel<T>(
+open class MessageChannel<T>(
   private val pool: ConnectionPool,
   private val handler: MessageHandler): BaseChannel() {
 
