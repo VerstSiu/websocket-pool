@@ -25,6 +25,8 @@ import com.ijoic.data.source.websocket.okhttp.options.WebSocketOptions
 import com.ijoic.data.source.websocket.okhttp.ping.PingManager
 import okhttp3.*
 import okio.ByteString
+import java.net.InetSocketAddress
+import java.net.Proxy
 
 /**
  * WebSocket connection
@@ -64,7 +66,7 @@ class WebSocketConnection(
       .url(options.url)
       .build()
 
-    prepareSocket = client.newWebSocket(request, object: WebSocketListener() {
+    prepareSocket = getClientInstance(options).newWebSocket(request, object: WebSocketListener() {
       override fun onOpen(webSocket: WebSocket, response: Response) {
         if (prepareActiveId != activeId) {
           return
@@ -152,6 +154,18 @@ class WebSocketConnection(
   }
 
   companion object {
-    private val client by lazy { OkHttpClient() }
+    private val defaultOkHttpClient by lazy { OkHttpClient() }
+
+    private fun getClientInstance(options: WebSocketOptions): OkHttpClient {
+      val proxyHost = options.proxyHost
+      val proxyPort = options.proxyPort
+
+      if (proxyHost != null && !proxyHost.isBlank() && proxyPort != null) {
+        return OkHttpClient.Builder()
+          .proxy(Proxy(Proxy.Type.HTTP, InetSocketAddress(proxyHost, proxyPort)))
+          .build()
+      }
+      return defaultOkHttpClient
+    }
   }
 }

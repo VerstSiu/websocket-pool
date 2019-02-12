@@ -26,6 +26,8 @@ import java.time.Duration
  */
 data class WebSocketOptions(
   val url: String,
+  val proxyHost: String? = null,
+  val proxyPort: Int? = null,
   val pingMessage: String? = null,
   val pongMessage: String? = null,
   val genPingMessage: (() -> String)? = null,
