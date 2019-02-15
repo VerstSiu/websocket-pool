@@ -60,7 +60,7 @@ abstract class BaseConnection(private val context: ExecutorContext): Connection 
       val oldHandlerItems = this.handlerItems
 
       if (oldHandlerItems.isEmpty()) {
-        connectionLogger.trace {
+        connectionLogger.debug {
           SimpleMessage("no handler found to dispatch message: $message")
         }
       } else {
@@ -73,7 +73,7 @@ abstract class BaseConnection(private val context: ExecutorContext): Connection 
           }
         }
         if (!msgDispatched) {
-          connectionLogger.trace {
+          connectionLogger.debug {
             SimpleMessage("message dispatch failed with all handlers (${oldHandlerItems.size}): $message")
           }
         }

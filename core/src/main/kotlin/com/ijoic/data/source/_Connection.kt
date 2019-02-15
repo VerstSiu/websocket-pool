@@ -28,7 +28,7 @@ private val connectionLogger = LogManager.getLogger(Connection::class.java)
  * @author verstsiu created at 2019-01-24 16:19
  */
 fun Connection.send(message: Any, errorHandler: (Throwable) -> Unit) {
-  connectionLogger.trace { SimpleMessage(message.toString()) }
+  connectionLogger.debug { SimpleMessage("[SEND] $this: $message") }
 
   try {
     send(message)
