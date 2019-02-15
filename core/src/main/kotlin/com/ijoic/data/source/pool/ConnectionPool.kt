@@ -80,6 +80,8 @@ class ConnectionPool(
   }
 
   private fun onRequestConnections(size: Int) {
+    logger.trace("$this request connections - $size")
+
     if (retryBusy) {
       val oldRequestSize = metrics.requestSize + 1
 
