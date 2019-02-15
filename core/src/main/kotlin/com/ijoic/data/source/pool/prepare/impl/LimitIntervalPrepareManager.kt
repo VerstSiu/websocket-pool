@@ -65,6 +65,7 @@ internal class LimitIntervalPrepareManager(
     if (waitSize <= 0) {
       return
     }
+    println("$this >> prepare complete")
     doConnectionPrepare()
   }
 
@@ -102,6 +103,7 @@ internal class LimitIntervalPrepareManager(
     if (waitSize <= 0) {
       return
     }
+    println("$this >> checkout connection prepare")
     doConnectionPrepare()
   }
 }
