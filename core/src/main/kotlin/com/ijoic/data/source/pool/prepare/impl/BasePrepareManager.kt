@@ -29,6 +29,7 @@ abstract class BasePrepareManager: PrepareManager {
   private val editLock = Object()
 
   override fun requestConnections(size: Int) {
+    println("$this request connections begin, old size - $requestSize, size - $size")
     if (size <= 0) {
       return
     }
@@ -40,6 +41,7 @@ abstract class BasePrepareManager: PrepareManager {
         onRequestConnections(appendSize)
       }
     }
+    println("$this request connections end, request size - $requestSize")
   }
 
   override fun appendConnections(size: Int) {
