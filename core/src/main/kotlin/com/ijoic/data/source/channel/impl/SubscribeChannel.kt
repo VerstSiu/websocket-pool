@@ -43,12 +43,7 @@ class SubscribeChannel<DATA, MSG>(
       synchronized(editLock) {
         bindConnection = connection
         connection.addMessageHandler(handler)
-
-        activeMessages.forEach {
-          if (it != null) {
-            connection.send(it, onError)
-          }
-        }
+        sendSubscribe(connection, Operation.SUBSCRIBE, activeMessages)
       }
     }
 
