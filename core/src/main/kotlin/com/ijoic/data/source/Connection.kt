@@ -39,8 +39,10 @@ interface Connection {
 
   /**
    * Prepare connection with [listener]
+   *
+   * Note: Accept nullable [listener] for mokito test
    */
-  fun prepare(listener: ConnectionListener)
+  fun prepare(listener: ConnectionListener?)
 
   /**
    * Release connection

@@ -59,7 +59,8 @@ class WebSocketConnection(
   override var isActive: Boolean = false
     private set
 
-  override fun prepare(listener: ConnectionListener) {
+  override fun prepare(listener: ConnectionListener?) {
+    listener ?: return
     if (isActive || prepareSocket != null || activeSocket != null) {
       return
     }
