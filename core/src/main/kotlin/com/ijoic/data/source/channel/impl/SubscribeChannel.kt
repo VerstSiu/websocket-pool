@@ -27,11 +27,13 @@ import com.ijoic.data.source.send
  *
  * @author verstsiu created at 2019-01-24 18:42
  */
-class SubscribeChannel<T>(
+class SubscribeChannel<DATA, MSG>(
   private val pool: ConnectionPool,
-  private val handler: MessageHandler): BaseChannel() {
+  private val handler: MessageHandler,
+  private val mapSubscribe: (Operation, DATA) -> MSG,
+  private val mapSubscribeMerge: ((Operation, List<DATA>) -> MSG)? = null): BaseChannel() {
 
-  private val activeMessages = mutableListOf<T>()
+  private val activeMessages = mutableListOf<DATA>()
   private var bindConnection: Connection? = null
 
   private val editLock = Object()
@@ -61,22 +63,24 @@ class SubscribeChannel<T>(
   }
 
   /**
-   * Add [subscribe] message
+   * Add [subscribe] data
    */
-  fun add(subscribe: T, sendRepeat: Boolean = false) {
+  fun add(subscribe: DATA, sendRepeat: Boolean = false) {
+    val operation = Operation.SUBSCRIBE
+
     synchronized(editLock) {
       if (subscribe == null) {
         return
       }
       if (activeMessages.contains(subscribe)) {
         if (sendRepeat) {
-          sendMessageWithExistConnection(subscribe)
+          sendMessageWithExistConnection(mapSubscribe(operation, subscribe))
         }
         return
       }
       activeMessages.add(subscribe)
 
-      if (sendMessageWithExistConnection(subscribe)) {
+      if (sendMessageWithExistConnection(mapSubscribe(operation, subscribe))) {
         return
       }
       val connection = pool.getActiveConnections(1).firstOrNull()
@@ -87,20 +91,53 @@ class SubscribeChannel<T>(
       } else {
         bindConnection = connection
         connection.addMessageHandler(handler)
-
-        activeMessages.forEach {
-          if (it != null) {
-            connection.send(it, onError)
-          }
-        }
+        sendSubscribe(connection, Operation.SUBSCRIBE, activeMessages)
       }
     }
   }
 
   /**
-   * Remove [subscribe] message with [unsubscribe]
+   * Add [subscribe] data all
    */
-  fun remove(subscribe: T, unsubscribe: T) {
+  fun addAll(subscribe: List<DATA>, sendRepeat: Boolean = false) {
+    val operation = Operation.SUBSCRIBE
+
+    synchronized(editLock) {
+      val addMessages = subscribe
+        .toMutableList()
+        .apply { removeAll(activeMessages) }
+
+      if (addMessages.isEmpty()) {
+        if (sendRepeat) {
+          sendSubscribeWithExistConnection(operation, subscribe)
+        }
+        return
+      }
+      activeMessages.addAll(addMessages)
+
+      if ((sendRepeat && sendSubscribeWithExistConnection(operation, subscribe))
+        || (!sendRepeat && sendSubscribeWithExistConnection(operation, addMessages))) {
+        return
+      }
+      val connection = pool.getActiveConnections(1).firstOrNull()
+
+      if (connection == null) {
+        pool.addConnectionChangeListener(connectionListener)
+        pool.requestConnections(1)
+      } else {
+        bindConnection = connection
+        connection.addMessageHandler(handler)
+        sendSubscribe(connection, Operation.SUBSCRIBE, activeMessages)
+      }
+    }
+  }
+
+  /**
+   * Remove [subscribe] data
+   */
+  fun remove(subscribe: DATA) {
+    val operation = Operation.UNSUBSCRIBE
+
     synchronized(editLock) {
       if (!activeMessages.contains(subscribe)) {
         return
@@ -108,8 +145,12 @@ class SubscribeChannel<T>(
       activeMessages.remove(subscribe)
       val oldConnection = bindConnection
 
-      if (oldConnection != null && oldConnection.isActive && unsubscribe != null) {
-        oldConnection.send(unsubscribe)
+      if (oldConnection != null && oldConnection.isActive) {
+        val msg = mapSubscribe(operation, subscribe)
+
+        if (msg != null) {
+          oldConnection.send(msg, onError)
+        }
       }
       if (activeMessages.isEmpty()) {
         pool.removeConnectionChangeListener(connectionListener)
@@ -119,7 +160,53 @@ class SubscribeChannel<T>(
     }
   }
 
-  private fun sendMessageWithExistConnection(message: Any): Boolean {
+  /**
+   * Remove [subscribe] data all
+   */
+  fun removeAll(subscribe: List<DATA>) {
+    val operation = Operation.UNSUBSCRIBE
+
+    synchronized(editLock) {
+      val removeMessages = subscribe
+        .toMutableList()
+        .apply { retainAll(activeMessages) }
+
+      if (removeMessages.isEmpty()) {
+        return
+      }
+      activeMessages.removeAll(removeMessages)
+      val oldConnection = bindConnection
+
+      if (oldConnection != null && oldConnection.isActive) {
+        sendSubscribe(oldConnection, operation, removeMessages)
+      }
+      if (activeMessages.isEmpty()) {
+        pool.removeConnectionChangeListener(connectionListener)
+        bindConnection?.removeMessageHandler(handler)
+        bindConnection = null
+      }
+    }
+  }
+
+  private fun sendSubscribe(connection: Connection, operation: Operation, items: List<DATA>) {
+    if (mapSubscribeMerge != null) {
+      val msg = mapSubscribeMerge.invoke(operation, items)
+
+      if (msg != null) {
+        connection.send(msg, onError)
+      }
+    } else {
+      items.forEach {
+        val msg = mapSubscribe(operation, it)
+
+        if (msg != null) {
+          connection.send(msg, onError)
+        }
+      }
+    }
+  }
+
+  private fun sendSubscribeWithExistConnection(operation: Operation, items: List<DATA>): Boolean {
     val oldConnection = bindConnection
 
     if (oldConnection != null) {
@@ -127,6 +214,20 @@ class SubscribeChannel<T>(
         bindConnection = null
         oldConnection.removeMessageHandler(handler)
       } else {
+        sendSubscribe(oldConnection, operation, items)
+      }
+    }
+    return bindConnection != null
+  }
+
+  private fun sendMessageWithExistConnection(message: MSG): Boolean {
+    val oldConnection = bindConnection
+
+    if (oldConnection != null) {
+      if (!oldConnection.isActive) {
+        bindConnection = null
+        oldConnection.removeMessageHandler(handler)
+      } else if (message != null) {
         oldConnection.send(message, onError)
       }
     }
@@ -140,5 +241,20 @@ class SubscribeChannel<T>(
       bindConnection?.removeMessageHandler(handler)
       bindConnection = null
     }
+  }
+
+  /**
+   * Operation
+   */
+  enum class Operation {
+    /**
+     * Subscribe
+     */
+    SUBSCRIBE,
+
+    /**
+     * Unsubscribe
+     */
+    UNSUBSCRIBE
   }
 }
