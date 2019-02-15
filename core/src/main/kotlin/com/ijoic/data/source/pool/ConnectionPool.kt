@@ -99,7 +99,7 @@ class ConnectionPool(
   private fun onPrepareConnection() {
     val connection = connectionFactory.borrowObject()
     val prepareActiveId = this.activeId
-    val taskId = "connection - ${connectionId++}"
+    val taskId = "${connection.displayName} - ${connectionId++}"
     logger.trace("[$taskId] prepare connection")
 
     connection.prepare(object : ConnectionListener {

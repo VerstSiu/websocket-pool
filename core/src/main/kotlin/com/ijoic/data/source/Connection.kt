@@ -28,6 +28,11 @@ import java.lang.IllegalStateException
  */
 interface Connection {
   /**
+   * Display name
+   */
+  val displayName: String
+
+  /**
    * Active status
    */
   val isActive: Boolean
