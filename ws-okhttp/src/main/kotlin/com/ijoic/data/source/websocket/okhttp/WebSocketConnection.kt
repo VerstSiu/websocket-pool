@@ -54,6 +54,8 @@ class WebSocketConnection(
 
   private var activeId = 0
 
+  override val displayName: String = options.url
+
   override var isActive: Boolean = false
     private set
 

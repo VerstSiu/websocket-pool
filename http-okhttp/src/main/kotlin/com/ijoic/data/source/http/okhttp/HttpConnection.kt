@@ -38,6 +38,8 @@ class HttpConnection(
   private var failMessage: Any? = null
   private var httpCall: Call? = null
 
+  override val displayName: String = api
+
   override var isActive: Boolean = false
     private set
 
