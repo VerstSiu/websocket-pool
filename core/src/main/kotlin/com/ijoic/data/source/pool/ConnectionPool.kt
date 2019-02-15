@@ -100,7 +100,7 @@ class ConnectionPool(
     val connection = connectionFactory.borrowObject()
     val prepareActiveId = this.activeId
     val taskId = "${connection.displayName} - ${connectionId++}"
-    logger.trace("[$taskId] prepare connection")
+    logger.trace("[$this][$taskId] prepare connection")
 
     connection.prepare(object : ConnectionListener {
       override fun onConnectionComplete() {
