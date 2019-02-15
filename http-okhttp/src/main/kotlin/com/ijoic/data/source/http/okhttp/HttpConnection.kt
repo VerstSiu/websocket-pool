@@ -51,7 +51,8 @@ class HttpConnection(
     httpCall = null
   }
 
-  override fun prepare(listener: ConnectionListener) {
+  override fun prepare(listener: ConnectionListener?) {
+    listener ?: return
     stateListener = listener
     val oldFailMessage = failMessage
 
