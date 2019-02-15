@@ -63,9 +63,15 @@ class SubscribeChannel<T>(
   /**
    * Add [subscribe] message
    */
-  fun add(subscribe: T) {
+  fun add(subscribe: T, sendRepeat: Boolean = false) {
     synchronized(editLock) {
-      if (subscribe == null || activeMessages.contains(subscribe)) {
+      if (subscribe == null) {
+        return
+      }
+      if (activeMessages.contains(subscribe)) {
+        if (sendRepeat) {
+          sendMessageWithExistConnection(subscribe)
+        }
         return
       }
       activeMessages.add(subscribe)
