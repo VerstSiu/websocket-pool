@@ -48,6 +48,7 @@ internal class LimitIntervalPrepareManager(
       val currTime = context.getCurrentTime()
 
       if (lastPrepareTime <= 0 || currTime - lastPrepareTime > interval) {
+        println("$this do prepare: last prepare time - $lastPrepareTime, curr time - $currTime, interval - $interval")
         doConnectionPrepare()
       } else {
         waitBusy = true
@@ -65,7 +66,6 @@ internal class LimitIntervalPrepareManager(
     if (waitSize <= 0) {
       return
     }
-    println("$this >> prepare complete")
     doConnectionPrepare()
   }
 
@@ -103,7 +103,6 @@ internal class LimitIntervalPrepareManager(
     if (waitSize <= 0) {
       return
     }
-    println("$this >> checkout connection prepare")
     doConnectionPrepare()
   }
 }
