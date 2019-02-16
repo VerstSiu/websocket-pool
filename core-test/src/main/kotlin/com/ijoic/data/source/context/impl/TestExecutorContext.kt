@@ -34,6 +34,13 @@ class TestExecutorContext: ExecutorContext {
   private var lastCurrTime = 0L
 
   /**
+   * Set current time with [timestamp]
+   */
+  fun setCurrentTime(timestamp: Long) {
+    lastCurrTime = timestamp
+  }
+
+  /**
    * Elapse curr time with [milliseconds]
    */
   fun elaspse(milliseconds: Long) {
