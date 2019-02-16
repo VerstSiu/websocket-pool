@@ -1,5 +1,6 @@
 rootProject.name = 'websocket-pool'
 include 'core'
+include 'core-test'
 include 'http-okhttp'
 include 'sample'
 include 'ws-okhttp'
