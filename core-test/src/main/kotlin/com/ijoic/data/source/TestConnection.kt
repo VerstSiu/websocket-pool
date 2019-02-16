@@ -46,7 +46,7 @@ class TestConnection : Connection {
     handlerItems = emptyList()
   }
 
-  override fun send(message: Any) {
+  override fun send(message: Any?) {
     mockConnection.send(message)
   }
 

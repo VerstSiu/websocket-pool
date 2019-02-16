@@ -64,7 +64,8 @@ class HttpConnection(
     }
   }
 
-  override fun send(message: Any) {
+  override fun send(message: Any?) {
+    message ?: return
     failMessage = null
     context.io { doSendMessage(message) }
   }

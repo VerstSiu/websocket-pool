@@ -133,7 +133,8 @@ class WebSocketConnection(
     })
   }
 
-  override fun send(message: Any) {
+  override fun send(message: Any?) {
+    message ?: return
     val socket = activeSocket
 
     if (!isActive || socket == null) {
