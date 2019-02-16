@@ -75,6 +75,26 @@ class TestConnection : Connection {
     currListener?.onConnectionClosed(message, error)
   }
 
+  /**
+   * Notify message received
+   */
+  fun notifyMessageReceived(message: Any): Boolean {
+    val oldHandlerItems = this.handlerItems
+
+    if (!oldHandlerItems.isEmpty()) {
+      var msgDispatched = false
+
+      for (handler in handlerItems) {
+        if (handler.dispatchMessage(message)) {
+          msgDispatched = true
+          break
+        }
+      }
+      return msgDispatched
+    }
+    return false
+  }
+
   /* -- notify :end -- */
 
   /* -- message handler :begin -- */
