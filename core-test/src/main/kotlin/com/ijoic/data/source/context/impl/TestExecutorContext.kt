@@ -45,7 +45,7 @@ class TestExecutorContext: ExecutorContext {
    */
   fun elaspse(milliseconds: Long) {
     val currTime = lastCurrTime + milliseconds
-    lastCurrTime += currTime
+    lastCurrTime = currTime
 
     popScheduleElapsed(currTime)
   }
