@@ -109,6 +109,10 @@ class ConnectionPool(
     val taskId = "${connection.displayName} - $connectionId"
     logger.trace("[$taskId] prepare connection")
 
+    if (!activePrepared) {
+      activePrepared = true
+      stateListeners.forEach { it.onConnectionActivePrepare() }
+    }
     stateListeners.forEach { it.onConnectionBegin(connectionId) }
     connection.prepare(object : ConnectionListener {
       override fun onConnectionComplete() {
@@ -116,6 +120,9 @@ class ConnectionPool(
 
         if (prepareActiveId != activeId) {
           return
+        }
+        if (activeConnectionSize <= 0) {
+          stateListeners.forEach { it.onConnectionActive() }
         }
         stateListeners.forEach { it.onConnectionSucceed(connectionId) }
         syncEdit { onChildConnectionActive(connection) }
@@ -127,6 +134,9 @@ class ConnectionPool(
         if (prepareActiveId != activeId) {
           return
         }
+        if (activeConnectionSize == 1) {
+          stateListeners.forEach { it.onConnectionInactive() }
+        }
         stateListeners.forEach { it.onConnectionFailed(connectionId, error) }
         syncEdit { onChildConnectionInactive(connection) }
       }
@@ -136,6 +146,9 @@ class ConnectionPool(
 
         if (prepareActiveId != activeId) {
           return
+        }
+        if (activeConnectionSize == 1) {
+          stateListeners.forEach { it.onConnectionInactive() }
         }
         stateListeners.forEach { it.onConnectionFailed(connectionId, error) }
         syncEdit { onChildConnectionInactive(connection) }
@@ -284,6 +297,8 @@ class ConnectionPool(
   private var stateListeners: List<ConnectionStateListener> = emptyList()
   private var stateListenersLock = Object()
 
+  private var activePrepared = false
+
   /**
    * Add state [listener]
    */
@@ -313,17 +328,32 @@ class ConnectionPool(
     /**
      * Connection begin with [connectionId]
      */
-    fun onConnectionBegin(connectionId: Int)
+    fun onConnectionBegin(connectionId: Int) {}
 
     /**
      * Connection succeed with [connectionId]
      */
-    fun onConnectionSucceed(connectionId: Int)
+    fun onConnectionSucceed(connectionId: Int) {}
 
     /**
      * Connection failed with [connectionId] and [error]
      */
-    fun onConnectionFailed(connectionId: Int, error: Throwable? = null)
+    fun onConnectionFailed(connectionId: Int, error: Throwable? = null) {}
+
+    /**
+     * Connection active prepare
+     */
+    fun onConnectionActivePrepare() {}
+
+    /**
+     * Connection active
+     */
+    fun onConnectionActive() {}
+
+    /**
+     * Connection inactive
+     */
+    fun onConnectionInactive() {}
   }
 
   /* -- connection state listener :end -- */
