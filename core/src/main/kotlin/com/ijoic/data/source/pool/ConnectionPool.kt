@@ -307,6 +307,9 @@ class ConnectionPool(
       if (!stateListeners.contains(listener)) {
         stateListeners = stateListeners + listener
       }
+      if (activePrepared && activeConnectionSize <= 0) {
+        listener.onConnectionActivePrepare()
+      }
     }
   }
 
