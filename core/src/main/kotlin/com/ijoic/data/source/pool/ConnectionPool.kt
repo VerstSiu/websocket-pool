@@ -57,6 +57,12 @@ class ConnectionPool(
   private val editLock = Object()
 
   /**
+   * Active connection size
+   */
+  val activeConnectionSize: Int
+    get() = activeConnections.size
+
+  /**
    * Returns active connections with [size]
    */
   internal fun getActiveConnections(size: Int): List<Connection> {
@@ -75,7 +81,7 @@ class ConnectionPool(
   /**
    * Request connections with [size]
    */
-  internal fun requestConnections(size: Int) {
+  fun requestConnections(size: Int) {
     syncEdit { onRequestConnections(size) }
   }
 
