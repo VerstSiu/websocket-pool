@@ -105,9 +105,11 @@ class ConnectionPool(
   private fun onPrepareConnection() {
     val connection = connectionFactory.borrowObject()
     val prepareActiveId = this.activeId
-    val taskId = "${connection.displayName} - ${connectionId++}"
+    val connectionId = this.connectionId++
+    val taskId = "${connection.displayName} - $connectionId"
     logger.trace("[$taskId] prepare connection")
 
+    stateListeners.forEach { it.onConnectionBegin(connectionId) }
     connection.prepare(object : ConnectionListener {
       override fun onConnectionComplete() {
         logger.trace("[$taskId] connection complete")
@@ -115,6 +117,7 @@ class ConnectionPool(
         if (prepareActiveId != activeId) {
           return
         }
+        stateListeners.forEach { it.onConnectionSucceed(connectionId) }
         syncEdit { onChildConnectionActive(connection) }
       }
 
@@ -124,6 +127,7 @@ class ConnectionPool(
         if (prepareActiveId != activeId) {
           return
         }
+        stateListeners.forEach { it.onConnectionFailed(connectionId, error) }
         syncEdit { onChildConnectionInactive(connection) }
       }
 
@@ -133,6 +137,7 @@ class ConnectionPool(
         if (prepareActiveId != activeId) {
           return
         }
+        stateListeners.forEach { it.onConnectionFailed(connectionId, error) }
         syncEdit { onChildConnectionInactive(connection) }
       }
     })
@@ -273,6 +278,55 @@ class ConnectionPool(
   }
 
   /* -- connection listeners :end -- */
+
+  /* -- connection state listener :begin -- */
+
+  private var stateListeners: List<ConnectionStateListener> = emptyList()
+  private var stateListenersLock = Object()
+
+  /**
+   * Add state [listener]
+   */
+  fun addStateListener(listener: ConnectionStateListener) {
+    synchronized(stateListenersLock) {
+      if (!stateListeners.contains(listener)) {
+        stateListeners = stateListeners + listener
+      }
+    }
+  }
+
+  /**
+   * Remove state [listener]
+   */
+  fun removeStateListener(listener: ConnectionStateListener) {
+    synchronized(stateListenersLock) {
+      if (stateListeners.contains(listener)) {
+        stateListeners = stateListeners - listener
+      }
+    }
+  }
+
+  /**
+   * Connection state listener
+   */
+  interface ConnectionStateListener {
+    /**
+     * Connection begin with [connectionId]
+     */
+    fun onConnectionBegin(connectionId: Int)
+
+    /**
+     * Connection succeed with [connectionId]
+     */
+    fun onConnectionSucceed(connectionId: Int)
+
+    /**
+     * Connection failed with [connectionId] and [error]
+     */
+    fun onConnectionFailed(connectionId: Int, error: Throwable? = null)
+  }
+
+  /* -- connection state listener :end -- */
 
   private fun PoolConfig.toPrepareManager(): PrepareManager {
     val intervalMs = this.limitPrepareInterval
