@@ -45,6 +45,11 @@ interface Connection {
   fun prepare(listener: ConnectionListener?)
 
   /**
+   * Restart prepare
+   */
+  fun restartPrepare() {}
+
+  /**
    * Release connection
    */
   fun release()
