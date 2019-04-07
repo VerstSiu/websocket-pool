@@ -159,7 +159,7 @@ class WebSocketConnection(
       return
     }
     onRelease()
-    prepare(listener)
+    listener.onConnectionClosed("connection refresh", null)
   }
 
   override fun onRelease() {
