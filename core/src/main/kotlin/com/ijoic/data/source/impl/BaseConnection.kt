@@ -36,6 +36,7 @@ abstract class BaseConnection(private val context: ExecutorContext): Connection 
     val oldHandlerItems = handlerItems
 
     if (!oldHandlerItems.contains(handler)) {
+      handler.host = this
       handlerItems = oldHandlerItems
         .toMutableList()
         .apply { add(handler) }
@@ -46,6 +47,7 @@ abstract class BaseConnection(private val context: ExecutorContext): Connection 
     val oldHandlerItems = handlerItems
 
     if (oldHandlerItems.contains(handler)) {
+      handler.host = null
       handlerItems = oldHandlerItems
         .toMutableList()
         .apply { remove(handler) }

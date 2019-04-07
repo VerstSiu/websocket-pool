@@ -17,14 +17,22 @@
  */
 package com.ijoic.data.source.handler
 
+import com.ijoic.data.source.Connection
+
 /**
  * Message handler
  *
  * @author verstsiu created at 2019-01-22 16:09
  */
-interface MessageHandler {
+abstract class MessageHandler {
+  /**
+   * Host connection
+   */
+  var host: Connection? = null
+    internal set
+
   /**
    * Dispatch [message]
    */
-  fun dispatchMessage(message: Any): Boolean = false
+  open fun dispatchMessage(message: Any): Boolean = false
 }

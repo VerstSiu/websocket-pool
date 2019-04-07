@@ -52,7 +52,7 @@ fun main() {
   }
 }
 
-private class TestMessageHandler: MessageHandler {
+private class TestMessageHandler: MessageHandler() {
   override fun dispatchMessage(message: Any): Boolean {
     println("receive message: $message")
     return true
