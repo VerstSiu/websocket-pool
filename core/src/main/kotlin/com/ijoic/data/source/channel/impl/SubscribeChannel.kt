@@ -31,7 +31,8 @@ class SubscribeChannel<DATA, MSG>(
   private val pool: ConnectionPool,
   private val handler: MessageHandler,
   private val mapSubscribe: (Operation, DATA) -> MSG,
-  private val mapSubscribeMerge: ((Operation, List<DATA>) -> MSG)? = null): BaseChannel() {
+  private val mapSubscribeMerge: ((Operation, List<DATA>) -> MSG)? = null,
+  private val mergeGroupSize: Int = -1): BaseChannel() {
 
   private val activeMessages = mutableListOf<DATA>()
   private var bindConnection: Connection? = null
@@ -185,10 +186,17 @@ class SubscribeChannel<DATA, MSG>(
 
   private fun sendSubscribe(connection: Connection, operation: Operation, items: List<DATA>) {
     if (mapSubscribeMerge != null) {
-      val msg = mapSubscribeMerge.invoke(operation, items)
+      val mergeGroups = if (mergeGroupSize <= 1) {
+        listOf(items)
+      } else {
+        items.chunked(mergeGroupSize)
+      }
+      val msgItems = mergeGroups.map { mapSubscribeMerge.invoke(operation, it) }
 
-      if (msg != null) {
-        connection.send(msg, onError)
+      msgItems.forEach {
+        if (it != null) {
+          connection.send(it, onError)
+        }
       }
     } else {
       items.forEach {
