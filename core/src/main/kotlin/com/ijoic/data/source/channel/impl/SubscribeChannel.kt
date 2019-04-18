@@ -80,9 +80,9 @@ class SubscribeChannel<DATA, MSG>(
         return
       }
       val connection = pool.getActiveConnections(1).firstOrNull()
+      pool.addConnectionChangeListener(connectionListener)
 
       if (connection == null) {
-        pool.addConnectionChangeListener(connectionListener)
         pool.requestConnections(1)
       } else {
         bindConnection = connection
@@ -116,9 +116,9 @@ class SubscribeChannel<DATA, MSG>(
         return
       }
       val connection = pool.getActiveConnections(1).firstOrNull()
+      pool.addConnectionChangeListener(connectionListener)
 
       if (connection == null) {
-        pool.addConnectionChangeListener(connectionListener)
         pool.requestConnections(1)
       } else {
         bindConnection = connection
