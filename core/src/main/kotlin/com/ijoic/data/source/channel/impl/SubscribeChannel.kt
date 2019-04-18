@@ -42,6 +42,7 @@ class SubscribeChannel<DATA, MSG>(
   private val connectionListener = object: ConnectionPool.ConnectionChangedListener {
     override fun onConnectionActive(connection: Connection) {
       synchronized(editLock) {
+        println("$this - connection active, messages: ${activeMessages.joinToString()}")
         bindConnection = connection
         connection.addMessageHandler(handler)
         sendSubscribe(connection, Operation.SUBSCRIBE, activeMessages)
@@ -50,6 +51,7 @@ class SubscribeChannel<DATA, MSG>(
 
     override fun onConnectionInactive(connection: Connection) {
       synchronized(editLock) {
+        println("$this - connection inactive")
         if (connection == bindConnection) {
           bindConnection = null
           connection.removeMessageHandler(handler)
@@ -89,6 +91,7 @@ class SubscribeChannel<DATA, MSG>(
         connection.addMessageHandler(handler)
         sendSubscribe(connection, Operation.SUBSCRIBE, activeMessages)
       }
+      println("$this - add subscribe - $subscribe, messages: ${activeMessages.joinToString()}")
     }
   }
 
@@ -125,6 +128,7 @@ class SubscribeChannel<DATA, MSG>(
         connection.addMessageHandler(handler)
         sendSubscribe(connection, Operation.SUBSCRIBE, activeMessages)
       }
+      println("$this - add subscribe all - ${subscribe.joinToString()}, messages: ${activeMessages.joinToString()}")
     }
   }
 
@@ -153,6 +157,7 @@ class SubscribeChannel<DATA, MSG>(
         bindConnection?.removeMessageHandler(handler)
         bindConnection = null
       }
+      println("$this - remove subscribe - $subscribe, messages: ${activeMessages.joinToString()}")
     }
   }
 
@@ -181,6 +186,7 @@ class SubscribeChannel<DATA, MSG>(
         bindConnection?.removeMessageHandler(handler)
         bindConnection = null
       }
+      println("$this - remove subscribe all - ${subscribe.joinToString()}, messages: ${activeMessages.joinToString()}")
     }
   }
 
@@ -238,6 +244,7 @@ class SubscribeChannel<DATA, MSG>(
   }
 
   override fun release() {
+    println("$this - release")
     synchronized(editLock) {
       activeMessages.clear()
       pool.removeConnectionChangeListener(connectionListener)
