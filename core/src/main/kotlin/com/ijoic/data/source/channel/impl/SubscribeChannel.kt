@@ -70,28 +70,52 @@ class SubscribeChannel<DATA, MSG>(
    * Add [subscribe] data
    */
   fun add(subscribe: DATA, sendRepeat: Boolean = false) {
-    msgBatchManager.accept(SubscribeInfo(Operation.SUBSCRIBE, subscribe, sendRepeat))
+    val connection = checkAndRequestConnection()
+
+    if (connection == null) {
+      activeMessages.add(subscribe)
+    } else {
+      msgBatchManager.accept(SubscribeInfo(Operation.SUBSCRIBE, subscribe, sendRepeat))
+    }
   }
 
   /**
    * Add [subscribe] data all
    */
   fun addAll(subscribe: List<DATA>, sendRepeat: Boolean = false) {
-    msgBatchManager.acceptAll(subscribe.map { SubscribeInfo(Operation.SUBSCRIBE, it, sendRepeat) })
+    val connection = checkAndRequestConnection()
+
+    if (connection == null) {
+      activeMessages.addAll(subscribe)
+    } else {
+      msgBatchManager.acceptAll(subscribe.map { SubscribeInfo(Operation.SUBSCRIBE, it, sendRepeat) })
+    }
   }
 
   /**
    * Remove [subscribe] data
    */
   fun remove(subscribe: DATA) {
-    msgBatchManager.accept(SubscribeInfo(Operation.UNSUBSCRIBE, subscribe, false))
+    val connection = checkAndRequestConnection()
+
+    if (connection == null) {
+      activeMessages.remove(subscribe)
+    } else {
+      msgBatchManager.accept(SubscribeInfo(Operation.UNSUBSCRIBE, subscribe, false))
+    }
   }
 
   /**
    * Remove [subscribe] data all
    */
   fun removeAll(subscribe: List<DATA>) {
-    msgBatchManager.acceptAll(subscribe.map { SubscribeInfo(Operation.UNSUBSCRIBE, it, false) })
+    val connection = checkAndRequestConnection()
+
+    if (connection == null) {
+      activeMessages.removeAll(subscribe)
+    } else {
+      msgBatchManager.acceptAll(subscribe.map { SubscribeInfo(Operation.UNSUBSCRIBE, it, false) })
+    }
   }
 
   private fun dispatchSubscribe(items: List<SubscribeInfo<DATA>>) {
@@ -136,17 +160,29 @@ class SubscribeChannel<DATA, MSG>(
         sendSubscribeWithExistConnection(Operation.UNSUBSCRIBE, unsubscribeItems.toList())
         return
       }
-      val connection = pool.getActiveConnections(1).firstOrNull()
-      pool.addConnectionChangeListener(connectionListener)
+      val connection = checkAndRequestConnection()
 
-      if (connection == null) {
-        pool.requestConnections(1)
-      } else {
+      if (connection != null) {
         bindConnection = connection
         connection.addMessageHandler(handler)
         sendSubscribe(connection, Operation.SUBSCRIBE, activeMessages)
       }
     }
+  }
+
+  private fun checkAndRequestConnection(): Connection? {
+    val oldConnection = bindConnection
+
+    if (oldConnection != null) {
+      return oldConnection
+    }
+    val connection = pool.getActiveConnections(1).firstOrNull()
+    pool.addConnectionChangeListener(connectionListener)
+
+    if (connection == null) {
+      pool.requestConnections(1)
+    }
+    return connection
   }
 
   private fun sendSubscribe(connection: Connection, operation: Operation, items: List<DATA>) {
