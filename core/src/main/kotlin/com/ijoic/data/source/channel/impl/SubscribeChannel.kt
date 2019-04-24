@@ -18,6 +18,8 @@
 package com.ijoic.data.source.channel.impl
 
 import com.ijoic.data.source.Connection
+import com.ijoic.data.source.context.ExecutorContext
+import com.ijoic.data.source.context.impl.DefaultExecutorContext
 import com.ijoic.data.source.handler.MessageHandler
 import com.ijoic.data.source.pool.ConnectionPool
 import com.ijoic.data.source.send
@@ -35,13 +37,14 @@ class SubscribeChannel<DATA, MSG>(
   private val mapSubscribe: (Operation, DATA) -> MSG,
   private val mapSubscribeMerge: ((Operation, List<DATA>) -> MSG)? = null,
   private val mergeGroupSize: Int = -1,
-  mergeDuration: Duration = Duration.ofMillis(20)): BaseChannel() {
+  mergeDuration: Duration = Duration.ofMillis(20),
+  context: ExecutorContext = DefaultExecutorContext): BaseChannel() {
 
   private val activeMessages = mutableListOf<DATA>()
   private var bindConnection: Connection? = null
 
   private val editLock = Object()
-  private val msgBatchManager = BatchManager(mergeDuration, onDispatch = this::dispatchSubscribe)
+  private val msgBatchManager = BatchManager(mergeDuration, context, onDispatch = this::dispatchSubscribe)
 
   private val connectionListener = object: ConnectionPool.ConnectionChangedListener {
     override fun onConnectionActive(connection: Connection) {

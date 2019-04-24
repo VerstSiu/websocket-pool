@@ -58,6 +58,7 @@ class TestConnection : Connection {
    * Notify connection complete
    */
   fun notifyConnectionComplete() {
+    isActive = true
     currListener?.onConnectionComplete()
   }
 
@@ -65,6 +66,7 @@ class TestConnection : Connection {
    * Notify connection failure
    */
   fun notifyConnectionFailure(error: Throwable?) {
+    isActive = false
     currListener?.onConnectionFailure(error)
   }
 
@@ -72,6 +74,7 @@ class TestConnection : Connection {
    * Notify connection closed
    */
   fun notifyConnectionClosed(message: String?, error: Throwable?) {
+    isActive = false
     currListener?.onConnectionClosed(message, error)
   }
 
