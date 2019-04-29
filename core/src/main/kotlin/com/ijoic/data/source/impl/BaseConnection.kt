@@ -58,6 +58,8 @@ abstract class BaseConnection(private val context: ExecutorContext): Connection 
    * Dispatch received [message]
    */
   protected fun dispatchReceivedMessage(message: Any) {
+    val receiveTime = context.getCurrentTime()
+
     context.io {
       val oldHandlerItems = this.handlerItems
 
@@ -69,7 +71,7 @@ abstract class BaseConnection(private val context: ExecutorContext): Connection 
         var msgDispatched = false
 
         for (handler in handlerItems) {
-          if (handler.dispatchMessage(message)) {
+          if (handler.dispatchMessage(receiveTime, message)) {
             msgDispatched = true
             break
           }

@@ -18,7 +18,7 @@ class SubscribeChannelTest {
     val connection = TestConnection()
     val pool = ConnectionPool { connection }
     val handler = object: MessageHandler() {
-      override fun dispatchMessage(message: Any): Boolean {
+      override fun dispatchMessage(receiveTime: Long, message: Any): Boolean {
         return true
       }
     }

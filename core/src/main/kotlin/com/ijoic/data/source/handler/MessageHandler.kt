@@ -32,7 +32,7 @@ abstract class MessageHandler {
     internal set
 
   /**
-   * Dispatch [message]
+   * Dispatch [receiveTime] with [message]
    */
-  open fun dispatchMessage(message: Any): Boolean = false
+  open fun dispatchMessage(receiveTime: Long, message: Any): Boolean = false
 }

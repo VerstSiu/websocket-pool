@@ -17,6 +17,8 @@
  */
 package com.ijoic.data.source
 
+import com.ijoic.data.source.context.ExecutorContext
+import com.ijoic.data.source.context.impl.DefaultExecutorContext
 import com.ijoic.data.source.handler.MessageHandler
 import org.mockito.Mockito.mock
 
@@ -25,7 +27,7 @@ import org.mockito.Mockito.mock
  *
  * @author verstsiu created at 2019-02-16 18:06
  */
-class TestConnection : Connection {
+class TestConnection(private val context: ExecutorContext = DefaultExecutorContext) : Connection {
 
   /**
    * Mock connection
@@ -82,13 +84,14 @@ class TestConnection : Connection {
    * Notify message received
    */
   fun notifyMessageReceived(message: Any): Boolean {
+    val receiveTime = context.getCurrentTime()
     val oldHandlerItems = this.handlerItems
 
     if (!oldHandlerItems.isEmpty()) {
       var msgDispatched = false
 
       for (handler in handlerItems) {
-        if (handler.dispatchMessage(message)) {
+        if (handler.dispatchMessage(receiveTime, message)) {
           msgDispatched = true
           break
         }

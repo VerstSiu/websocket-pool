@@ -53,7 +53,7 @@ fun main() {
 }
 
 private class TestMessageHandler: MessageHandler() {
-  override fun dispatchMessage(message: Any): Boolean {
+  override fun dispatchMessage(receiveTime: Long, message: Any): Boolean {
     println("receive message: $message")
     return true
   }
