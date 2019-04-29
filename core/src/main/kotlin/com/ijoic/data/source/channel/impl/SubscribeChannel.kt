@@ -192,7 +192,9 @@ class SubscribeChannel<DATA, MSG>(
       } else {
         items.chunked(mergeGroupSize)
       }
-      val msgItems = mergeGroups.map { mapSubscribeMerge.invoke(operation, it) }
+      val msgItems = mergeGroups
+        .filter { !it.isEmpty() }
+        .map { mapSubscribeMerge.invoke(operation, it) }
 
       msgItems.forEach {
         if (it != null) {
