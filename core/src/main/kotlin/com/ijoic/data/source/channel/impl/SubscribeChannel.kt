@@ -152,12 +152,10 @@ class SubscribeChannel<DATA, MSG>(
         .toMutableSet()
         .apply { removeAll(subscribeItems) }
 
-      // send repeat items
-      sendSubscribeWithExistConnection(Operation.SUBSCRIBE, sendRepeatItems.toList())
-
       // subscribe/unsubscribe items
-      if (sendSubscribeWithExistConnection(Operation.SUBSCRIBE, subscribeItems.toList())) {
-        sendSubscribeWithExistConnection(Operation.UNSUBSCRIBE, unsubscribeItems.toList())
+      if (sendSubscribeWithExistConnection(Operation.UNSUBSCRIBE, unsubscribeItems.toList())) {
+        sendSubscribeWithExistConnection(Operation.SUBSCRIBE, sendRepeatItems.toList())
+        sendSubscribeWithExistConnection(Operation.SUBSCRIBE, subscribeItems.toList())
         return
       }
       val connection = checkAndRequestConnection()
@@ -222,8 +220,9 @@ class SubscribeChannel<DATA, MSG>(
       } else {
         sendSubscribe(oldConnection, operation, items)
       }
+      return true
     }
-    return bindConnection != null
+    return false
   }
 
   override fun release() {
