@@ -24,7 +24,9 @@ import com.ijoic.data.source.handler.MessageHandler
 import com.ijoic.data.source.pool.ConnectionPool
 import com.ijoic.data.source.send
 import com.ijoic.data.source.util.BatchManager
+import com.ijoic.data.source.util.checkAndCancel
 import java.time.Duration
+import java.util.concurrent.Future
 
 /**
  * Subscribe channel
@@ -37,8 +39,9 @@ class SubscribeChannel<DATA, MSG>(
   private val mapSubscribe: (Operation, DATA) -> MSG,
   private val mapSubscribeMerge: ((Operation, List<DATA>) -> MSG)? = null,
   private val mergeGroupSize: Int = -1,
+  private val context: ExecutorContext = DefaultExecutorContext,
   mergeDuration: Duration = Duration.ofMillis(20),
-  context: ExecutorContext = DefaultExecutorContext): BaseChannel() {
+  retrySubscribeDuration: Duration = Duration.ZERO): BaseChannel() {
 
   private val activeMessages = mutableListOf<DATA>()
   private var bindConnection: Connection? = null
@@ -57,6 +60,8 @@ class SubscribeChannel<DATA, MSG>(
 
     override fun onConnectionInactive(connection: Connection) {
       synchronized(editLock) {
+        clearRetryTask()
+
         if (connection == bindConnection) {
           bindConnection = null
           connection.removeMessageHandler(handler)
@@ -227,6 +232,7 @@ class SubscribeChannel<DATA, MSG>(
 
   override fun release() {
     synchronized(editLock) {
+      clearRetryTask()
       activeMessages.clear()
       pool.removeConnectionChangeListener(connectionListener)
       bindConnection?.removeMessageHandler(handler)
@@ -234,6 +240,52 @@ class SubscribeChannel<DATA, MSG>(
       msgBatchManager.release()
     }
   }
+
+  /* -- retry subscribe :begin -- */
+
+  private val retrySubscribeMs = retrySubscribeDuration.toMillis()
+  private val failedItems = mutableSetOf<DATA>()
+
+  private var retryTask: Future<*>? = null
+
+  /**
+   * Notify [subscribe] failed
+   */
+  fun notifySubscribeFailed(subscribe: DATA) {
+    if (!activeMessages.contains(subscribe)) {
+      return
+    }
+    if (retrySubscribeMs <= 0) {
+      sendSubscribeWithExistConnection(Operation.SUBSCRIBE, listOf(subscribe))
+    } else {
+      failedItems.add(subscribe)
+      scheduleRetryTask()
+    }
+  }
+
+  private fun scheduleRetryTask() {
+    val oldTask = retryTask
+
+    if (oldTask != null && !oldTask.isDone && !oldTask.isCancelled) {
+      return
+    }
+    retryTask = context.scheduleDelay(retrySubscribeMs) {
+      retryTask = null
+      val items = failedItems.toList()
+      failedItems.clear()
+
+      if (!items.isEmpty()) {
+        sendSubscribeWithExistConnection(Operation.SUBSCRIBE, items)
+      }
+    }
+  }
+
+  private fun clearRetryTask() {
+    retryTask?.checkAndCancel()
+    retryTask = null
+  }
+
+  /* -- retry subscribe :end -- */
 
   /**
    * Operation
