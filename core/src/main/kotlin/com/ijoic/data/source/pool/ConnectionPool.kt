@@ -57,6 +57,12 @@ class ConnectionPool(
   private val editLock = Object()
 
   /**
+   * Active connection size
+   */
+  val activeConnectionSize: Int
+    get() = activeConnections.size
+
+  /**
    * Returns active connections with [size]
    */
   internal fun getActiveConnections(size: Int): List<Connection> {
@@ -75,7 +81,7 @@ class ConnectionPool(
   /**
    * Request connections with [size]
    */
-  internal fun requestConnections(size: Int) {
+  fun requestConnections(size: Int) {
     logger.error("logger test", NullPointerException())
     syncEdit { onRequestConnections(size) }
   }
@@ -103,9 +109,15 @@ class ConnectionPool(
   private fun onPrepareConnection() {
     val connection = connectionFactory.borrowObject()
     val prepareActiveId = this.activeId
-    val taskId = "${connection.displayName} - ${connectionId++}"
-    logger.trace("[$this][$taskId] prepare connection")
+    val connectionId = this.connectionId++
+    val taskId = "${connection.displayName} - $connectionId"
+    logger.trace("[$taskId] prepare connection")
 
+    if (!activePrepared) {
+      activePrepared = true
+      stateListeners.forEach { it.onConnectionActivePrepare() }
+    }
+    stateListeners.forEach { it.onConnectionBegin(connectionId) }
     connection.prepare(object : ConnectionListener {
       override fun onConnectionComplete() {
         logger.trace("[$taskId] connection complete")
@@ -113,6 +125,10 @@ class ConnectionPool(
         if (prepareActiveId != activeId) {
           return
         }
+        if (activeConnectionSize <= 0) {
+          stateListeners.forEach { it.onConnectionActive() }
+        }
+        stateListeners.forEach { it.onConnectionSucceed(connectionId) }
         syncEdit { onChildConnectionActive(connection) }
       }
 
@@ -122,6 +138,10 @@ class ConnectionPool(
         if (prepareActiveId != activeId) {
           return
         }
+        if (activeConnectionSize == 1) {
+          stateListeners.forEach { it.onConnectionInactive() }
+        }
+        stateListeners.forEach { it.onConnectionFailed(connectionId, error) }
         syncEdit { onChildConnectionInactive(connection) }
       }
 
@@ -131,6 +151,10 @@ class ConnectionPool(
         if (prepareActiveId != activeId) {
           return
         }
+        if (activeConnectionSize == 1) {
+          stateListeners.forEach { it.onConnectionInactive() }
+        }
+        stateListeners.forEach { it.onConnectionFailed(connectionId, error) }
         syncEdit { onChildConnectionInactive(connection) }
       }
     })
@@ -271,6 +295,75 @@ class ConnectionPool(
   }
 
   /* -- connection listeners :end -- */
+
+  /* -- connection state listener :begin -- */
+
+  private var stateListeners: List<ConnectionStateListener> = emptyList()
+  private var stateListenersLock = Object()
+
+  private var activePrepared = false
+
+  /**
+   * Add state [listener]
+   */
+  fun addStateListener(listener: ConnectionStateListener) {
+    synchronized(stateListenersLock) {
+      if (!stateListeners.contains(listener)) {
+        stateListeners = stateListeners + listener
+      }
+      if (activePrepared && activeConnectionSize <= 0) {
+        listener.onConnectionActivePrepare()
+      }
+    }
+  }
+
+  /**
+   * Remove state [listener]
+   */
+  fun removeStateListener(listener: ConnectionStateListener) {
+    synchronized(stateListenersLock) {
+      if (stateListeners.contains(listener)) {
+        stateListeners = stateListeners - listener
+      }
+    }
+  }
+
+  /**
+   * Connection state listener
+   */
+  interface ConnectionStateListener {
+    /**
+     * Connection begin with [connectionId]
+     */
+    fun onConnectionBegin(connectionId: Int) {}
+
+    /**
+     * Connection succeed with [connectionId]
+     */
+    fun onConnectionSucceed(connectionId: Int) {}
+
+    /**
+     * Connection failed with [connectionId] and [error]
+     */
+    fun onConnectionFailed(connectionId: Int, error: Throwable? = null) {}
+
+    /**
+     * Connection active prepare
+     */
+    fun onConnectionActivePrepare() {}
+
+    /**
+     * Connection active
+     */
+    fun onConnectionActive() {}
+
+    /**
+     * Connection inactive
+     */
+    fun onConnectionInactive() {}
+  }
+
+  /* -- connection state listener :end -- */
 
   private fun PoolConfig.toPrepareManager(): PrepareManager {
     val intervalMs = this.limitPrepareInterval

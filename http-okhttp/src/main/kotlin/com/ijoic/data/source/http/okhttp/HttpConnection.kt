@@ -32,6 +32,8 @@ import okhttp3.Request
  */
 class HttpConnection(
   private val api: String,
+  private val buildUrl: (String, Any) -> String = { baseUrl, _ -> baseUrl },
+  private val buildRequest: (String, Any) -> Request = { url, _ -> Request.Builder().url(url).build() },
   private val context: ExecutorContext = DefaultExecutorContext): BaseConnection(context) {
 
   private var stateListener: ConnectionListener? = null
@@ -64,7 +66,8 @@ class HttpConnection(
     }
   }
 
-  override fun send(message: Any) {
+  override fun send(message: Any?) {
+    message ?: return
     failMessage = null
     context.io { doSendMessage(message) }
   }
@@ -73,9 +76,7 @@ class HttpConnection(
     var httpCall: Call? = null
 
     try {
-      val request = Request.Builder()
-        .url(api)
-        .build()
+      val request = buildRequest(buildUrl(api, message), message)
 
       httpCall = client.newCall(request)
       this.httpCall = httpCall

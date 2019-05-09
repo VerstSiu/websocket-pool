@@ -18,9 +18,15 @@
 package com.ijoic.data.source.channel.impl
 
 import com.ijoic.data.source.Connection
+import com.ijoic.data.source.context.ExecutorContext
+import com.ijoic.data.source.context.impl.DefaultExecutorContext
 import com.ijoic.data.source.handler.MessageHandler
 import com.ijoic.data.source.pool.ConnectionPool
 import com.ijoic.data.source.send
+import com.ijoic.data.source.util.BatchManager
+import com.ijoic.data.source.util.checkAndCancel
+import java.time.Duration
+import java.util.concurrent.Future
 
 /**
  * Subscribe channel
@@ -31,12 +37,17 @@ class SubscribeChannel<DATA, MSG>(
   private val pool: ConnectionPool,
   private val handler: MessageHandler,
   private val mapSubscribe: (Operation, DATA) -> MSG,
-  private val mapSubscribeMerge: ((Operation, List<DATA>) -> MSG)? = null): BaseChannel() {
+  private val mapSubscribeMerge: ((Operation, List<DATA>) -> MSG)? = null,
+  private val mergeGroupSize: Int = -1,
+  private val context: ExecutorContext = DefaultExecutorContext,
+  mergeDuration: Duration = Duration.ofMillis(20),
+  retrySubscribeDuration: Duration = Duration.ZERO): BaseChannel() {
 
   private val activeMessages = mutableListOf<DATA>()
   private var bindConnection: Connection? = null
 
   private val editLock = Object()
+  private val msgBatchManager = BatchManager(mergeDuration, context, onDispatch = this::dispatchSubscribe)
 
   private val connectionListener = object: ConnectionPool.ConnectionChangedListener {
     override fun onConnectionActive(connection: Connection) {
@@ -49,10 +60,13 @@ class SubscribeChannel<DATA, MSG>(
 
     override fun onConnectionInactive(connection: Connection) {
       synchronized(editLock) {
+        clearRetryTask()
+
         if (connection == bindConnection) {
           bindConnection = null
           connection.removeMessageHandler(handler)
         }
+        msgBatchManager.release()
       }
     }
   }
@@ -61,33 +75,12 @@ class SubscribeChannel<DATA, MSG>(
    * Add [subscribe] data
    */
   fun add(subscribe: DATA, sendRepeat: Boolean = false) {
-    val operation = Operation.SUBSCRIBE
+    val connection = checkAndRequestConnection()
 
-    synchronized(editLock) {
-      if (subscribe == null) {
-        return
-      }
-      if (activeMessages.contains(subscribe)) {
-        if (sendRepeat) {
-          sendMessageWithExistConnection(mapSubscribe(operation, subscribe))
-        }
-        return
-      }
+    if (connection == null) {
       activeMessages.add(subscribe)
-
-      if (sendMessageWithExistConnection(mapSubscribe(operation, subscribe))) {
-        return
-      }
-      val connection = pool.getActiveConnections(1).firstOrNull()
-
-      if (connection == null) {
-        pool.addConnectionChangeListener(connectionListener)
-        pool.requestConnections(1)
-      } else {
-        bindConnection = connection
-        connection.addMessageHandler(handler)
-        sendSubscribe(connection, Operation.SUBSCRIBE, activeMessages)
-      }
+    } else {
+      msgBatchManager.accept(SubscribeInfo(Operation.SUBSCRIBE, subscribe, sendRepeat))
     }
   }
 
@@ -95,35 +88,12 @@ class SubscribeChannel<DATA, MSG>(
    * Add [subscribe] data all
    */
   fun addAll(subscribe: List<DATA>, sendRepeat: Boolean = false) {
-    val operation = Operation.SUBSCRIBE
+    val connection = checkAndRequestConnection()
 
-    synchronized(editLock) {
-      val addMessages = subscribe
-        .toMutableList()
-        .apply { removeAll(activeMessages) }
-
-      if (addMessages.isEmpty()) {
-        if (sendRepeat) {
-          sendSubscribeWithExistConnection(operation, subscribe)
-        }
-        return
-      }
-      activeMessages.addAll(addMessages)
-
-      if ((sendRepeat && sendSubscribeWithExistConnection(operation, subscribe))
-        || (!sendRepeat && sendSubscribeWithExistConnection(operation, addMessages))) {
-        return
-      }
-      val connection = pool.getActiveConnections(1).firstOrNull()
-
-      if (connection == null) {
-        pool.addConnectionChangeListener(connectionListener)
-        pool.requestConnections(1)
-      } else {
-        bindConnection = connection
-        connection.addMessageHandler(handler)
-        sendSubscribe(connection, Operation.SUBSCRIBE, activeMessages)
-      }
+    if (connection == null) {
+      activeMessages.addAll(subscribe)
+    } else {
+      msgBatchManager.acceptAll(subscribe.map { SubscribeInfo(Operation.SUBSCRIBE, it, sendRepeat) })
     }
   }
 
@@ -131,27 +101,12 @@ class SubscribeChannel<DATA, MSG>(
    * Remove [subscribe] data
    */
   fun remove(subscribe: DATA) {
-    val operation = Operation.UNSUBSCRIBE
+    val connection = checkAndRequestConnection()
 
-    synchronized(editLock) {
-      if (!activeMessages.contains(subscribe)) {
-        return
-      }
+    if (connection == null) {
       activeMessages.remove(subscribe)
-      val oldConnection = bindConnection
-
-      if (oldConnection != null && oldConnection.isActive) {
-        val msg = mapSubscribe(operation, subscribe)
-
-        if (msg != null) {
-          oldConnection.send(msg, onError)
-        }
-      }
-      if (activeMessages.isEmpty()) {
-        pool.removeConnectionChangeListener(connectionListener)
-        bindConnection?.removeMessageHandler(handler)
-        bindConnection = null
-      }
+    } else {
+      msgBatchManager.accept(SubscribeInfo(Operation.UNSUBSCRIBE, subscribe, false))
     }
   }
 
@@ -159,36 +114,95 @@ class SubscribeChannel<DATA, MSG>(
    * Remove [subscribe] data all
    */
   fun removeAll(subscribe: List<DATA>) {
-    val operation = Operation.UNSUBSCRIBE
+    val connection = checkAndRequestConnection()
+
+    if (connection == null) {
+      activeMessages.removeAll(subscribe)
+    } else {
+      msgBatchManager.acceptAll(subscribe.map { SubscribeInfo(Operation.UNSUBSCRIBE, it, false) })
+    }
+  }
+
+  private fun dispatchSubscribe(items: List<SubscribeInfo<DATA>>) {
+    val subscribeItems = mutableSetOf<DATA>()
+    val unsubscribeItems = mutableSetOf<DATA>()
 
     synchronized(editLock) {
-      val removeMessages = subscribe
-        .toMutableList()
-        .apply { retainAll(activeMessages) }
+      items.forEach {
+        val data = it.item
 
-      if (removeMessages.isEmpty()) {
+        if (data != null) {
+          when (it.operation) {
+            Operation.SUBSCRIBE -> {
+              if (!activeMessages.contains(data)) {
+                activeMessages.add(data)
+                subscribeItems.add(data)
+                unsubscribeItems.remove(data)
+              }
+            }
+            Operation.UNSUBSCRIBE -> {
+              if (activeMessages.contains(data)) {
+                activeMessages.remove(data)
+                subscribeItems.remove(data)
+                unsubscribeItems.add(data)
+              }
+            }
+          }
+        }
+      }
+
+      val sendRepeatItems = items
+        .filter { it.operation == Operation.SUBSCRIBE && it.sendRepeat }
+        .map { it.item }
+        .toMutableSet()
+        .apply { removeAll(subscribeItems) }
+
+      // subscribe/unsubscribe items
+      if (sendSubscribeWithExistConnection(Operation.UNSUBSCRIBE, unsubscribeItems.toList())) {
+        sendSubscribeWithExistConnection(Operation.SUBSCRIBE, sendRepeatItems.toList())
+        sendSubscribeWithExistConnection(Operation.SUBSCRIBE, subscribeItems.toList())
         return
       }
-      activeMessages.removeAll(removeMessages)
-      val oldConnection = bindConnection
+      val connection = checkAndRequestConnection()
 
-      if (oldConnection != null && oldConnection.isActive) {
-        sendSubscribe(oldConnection, operation, removeMessages)
-      }
-      if (activeMessages.isEmpty()) {
-        pool.removeConnectionChangeListener(connectionListener)
-        bindConnection?.removeMessageHandler(handler)
-        bindConnection = null
+      if (connection != null) {
+        bindConnection = connection
+        connection.addMessageHandler(handler)
+        sendSubscribe(connection, Operation.SUBSCRIBE, activeMessages)
       }
     }
   }
 
+  private fun checkAndRequestConnection(): Connection? {
+    val oldConnection = bindConnection
+
+    if (oldConnection != null) {
+      return oldConnection
+    }
+    val connection = pool.getActiveConnections(1).firstOrNull()
+    pool.addConnectionChangeListener(connectionListener)
+
+    if (connection == null) {
+      pool.requestConnections(1)
+    }
+    return connection
+  }
+
   private fun sendSubscribe(connection: Connection, operation: Operation, items: List<DATA>) {
     if (mapSubscribeMerge != null) {
-      val msg = mapSubscribeMerge.invoke(operation, items)
+      val mergeGroups = if (mergeGroupSize <= 1) {
+        listOf(items)
+      } else {
+        items.chunked(mergeGroupSize)
+      }
+      val msgItems = mergeGroups
+        .filter { !it.isEmpty() }
+        .map { mapSubscribeMerge.invoke(operation, it) }
 
-      if (msg != null) {
-        connection.send(msg, onError)
+      msgItems.forEach {
+        if (it != null) {
+          connection.send(it, onError)
+        }
       }
     } else {
       items.forEach {
@@ -211,32 +225,67 @@ class SubscribeChannel<DATA, MSG>(
       } else {
         sendSubscribe(oldConnection, operation, items)
       }
+      return true
     }
-    return bindConnection != null
-  }
-
-  private fun sendMessageWithExistConnection(message: MSG): Boolean {
-    val oldConnection = bindConnection
-
-    if (oldConnection != null) {
-      if (!oldConnection.isActive) {
-        bindConnection = null
-        oldConnection.removeMessageHandler(handler)
-      } else if (message != null) {
-        oldConnection.send(message, onError)
-      }
-    }
-    return bindConnection != null
+    return false
   }
 
   override fun release() {
     synchronized(editLock) {
+      clearRetryTask()
       activeMessages.clear()
       pool.removeConnectionChangeListener(connectionListener)
       bindConnection?.removeMessageHandler(handler)
       bindConnection = null
+      msgBatchManager.release()
     }
   }
+
+  /* -- retry subscribe :begin -- */
+
+  private val retrySubscribeMs = retrySubscribeDuration.toMillis()
+  private val failedItems = mutableSetOf<DATA>()
+
+  private var retryTask: Future<*>? = null
+
+  /**
+   * Notify [subscribe] failed
+   */
+  fun notifySubscribeFailed(subscribe: DATA) {
+    if (!activeMessages.contains(subscribe)) {
+      return
+    }
+    if (retrySubscribeMs <= 0) {
+      sendSubscribeWithExistConnection(Operation.SUBSCRIBE, listOf(subscribe))
+    } else {
+      failedItems.add(subscribe)
+      scheduleRetryTask()
+    }
+  }
+
+  private fun scheduleRetryTask() {
+    val oldTask = retryTask
+
+    if (oldTask != null && !oldTask.isDone && !oldTask.isCancelled) {
+      return
+    }
+    retryTask = context.scheduleDelay(retrySubscribeMs) {
+      retryTask = null
+      val items = failedItems.toList()
+      failedItems.clear()
+
+      if (!items.isEmpty()) {
+        sendSubscribeWithExistConnection(Operation.SUBSCRIBE, items)
+      }
+    }
+  }
+
+  private fun clearRetryTask() {
+    retryTask?.checkAndCancel()
+    retryTask = null
+  }
+
+  /* -- retry subscribe :end -- */
 
   /**
    * Operation
@@ -252,4 +301,13 @@ class SubscribeChannel<DATA, MSG>(
      */
     UNSUBSCRIBE
   }
+
+  /**
+   * Subscribe info
+   */
+  private data class SubscribeInfo<T>(
+    val operation: Operation,
+    val item: T,
+    val sendRepeat: Boolean
+  )
 }

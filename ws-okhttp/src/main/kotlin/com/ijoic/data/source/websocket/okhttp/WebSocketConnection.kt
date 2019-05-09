@@ -25,6 +25,7 @@ import com.ijoic.data.source.websocket.okhttp.options.WebSocketOptions
 import com.ijoic.data.source.websocket.okhttp.ping.PingManager
 import okhttp3.*
 import okio.ByteString
+import java.lang.ref.WeakReference
 import java.net.InetSocketAddress
 import java.net.Proxy
 
@@ -59,11 +60,15 @@ class WebSocketConnection(
   override var isActive: Boolean = false
     private set
 
+  private var refActiveListener: WeakReference<ConnectionListener>? = null
+
   override fun prepare(listener: ConnectionListener?) {
     listener ?: return
     if (isActive || prepareSocket != null || activeSocket != null) {
       return
     }
+    refActiveListener = WeakReference(listener)
+
     val prepareActiveId = this.activeId
     val request = Request.Builder()
       .url(options.url)
@@ -133,7 +138,8 @@ class WebSocketConnection(
     })
   }
 
-  override fun send(message: Any) {
+  override fun send(message: Any?) {
+    message ?: return
     val socket = activeSocket
 
     if (!isActive || socket == null) {
@@ -144,6 +150,16 @@ class WebSocketConnection(
       is String -> socket.send(message)
       else -> throw IllegalArgumentException("invalid argument: $message")
     }
+  }
+
+  override fun restartPrepare() {
+    val listener = refActiveListener?.get()
+
+    if (!isActive || listener == null) {
+      return
+    }
+    onRelease()
+    listener.onConnectionClosed("connection refresh", null)
   }
 
   override fun onRelease() {
