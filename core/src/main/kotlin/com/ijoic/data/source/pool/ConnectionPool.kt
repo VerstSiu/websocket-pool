@@ -76,6 +76,7 @@ class ConnectionPool(
    * Request connections with [size]
    */
   internal fun requestConnections(size: Int) {
+    logger.error("logger test", NullPointerException())
     syncEdit { onRequestConnections(size) }
   }
 
