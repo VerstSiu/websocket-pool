@@ -22,6 +22,7 @@ import com.ijoic.data.source.context.ExecutorContext
 import com.ijoic.data.source.handler.MessageHandler
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.message.SimpleMessage
+import java.util.concurrent.Executors
 
 /**
  * Base connection
@@ -31,6 +32,7 @@ import org.apache.logging.log4j.message.SimpleMessage
 abstract class BaseConnection(private val context: ExecutorContext): Connection {
 
   private var handlerItems: List<MessageHandler> = emptyList()
+  private val executors = Executors.newFixedThreadPool(1)
 
   override fun addMessageHandler(handler: MessageHandler) {
     val oldHandlerItems = handlerItems
@@ -60,8 +62,8 @@ abstract class BaseConnection(private val context: ExecutorContext): Connection 
   protected fun dispatchReceivedMessage(message: Any) {
     val receiveTime = context.getCurrentTime()
 
-    context.io {
-      val oldHandlerItems = this.handlerItems
+    executors.run {
+      val oldHandlerItems = handlerItems
 
       if (oldHandlerItems.isEmpty()) {
         connectionLogger.debug {
@@ -70,7 +72,7 @@ abstract class BaseConnection(private val context: ExecutorContext): Connection 
       } else {
         var msgDispatched = false
 
-        for (handler in handlerItems) {
+        for (handler in oldHandlerItems) {
           if (handler.dispatchMessage(receiveTime, message)) {
             msgDispatched = true
             break
