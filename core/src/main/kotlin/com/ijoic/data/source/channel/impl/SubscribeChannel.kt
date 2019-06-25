@@ -41,7 +41,7 @@ class SubscribeChannel<DATA, MSG>(
   private val mergeGroupSize: Int = -1,
   private val context: ExecutorContext = DefaultExecutorContext,
   mergeDuration: Duration = Duration.ofMillis(20),
-  retrySubscribeDuration: Duration = Duration.ZERO): BaseChannel() {
+  retrySubscribeDuration: Duration = Duration.ofSeconds(2)): BaseChannel() {
 
   private val activeMessages = mutableListOf<DATA>()
   private var bindConnection: Connection? = null
@@ -293,7 +293,7 @@ class SubscribeChannel<DATA, MSG>(
       val items = failedItems.toList()
       failedItems.clear()
 
-      if (!items.isEmpty()) {
+      if (items.isNotEmpty()) {
         sendSubscribeWithExistConnection(Operation.SUBSCRIBE, items)
       }
     }

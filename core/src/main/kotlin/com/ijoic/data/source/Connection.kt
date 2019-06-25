@@ -39,10 +39,8 @@ interface Connection {
 
   /**
    * Prepare connection with [listener]
-   *
-   * Note: Accept nullable [listener] for mokito test
    */
-  fun prepare(listener: ConnectionListener?)
+  fun prepare(listener: ConnectionListener)
 
   /**
    * Restart prepare
@@ -57,8 +55,6 @@ interface Connection {
   /**
    * Send [message]
    *
-   * Note: Accept nullable [message] for mokito test
-   *
    * Throws [IllegalStateException] while connection is not active
    * Throws [IllegalArgumentException] while message type unrecognized
    */
@@ -66,7 +62,7 @@ interface Connection {
     IllegalStateException::class,
     IllegalArgumentException::class
   )
-  fun send(message: Any?)
+  fun send(message: Any)
 
   /**
    * Add message [handler]

@@ -20,7 +20,7 @@ package com.ijoic.data.source
 import com.ijoic.data.source.context.ExecutorContext
 import com.ijoic.data.source.context.impl.DefaultExecutorContext
 import com.ijoic.data.source.handler.MessageHandler
-import org.mockito.Mockito.mock
+import com.nhaarman.mockito_kotlin.mock
 
 /**
  * Test connection
@@ -32,24 +32,24 @@ class TestConnection(private val context: ExecutorContext = DefaultExecutorConte
   /**
    * Mock connection
    */
-  val mockConnection: Connection = mock(Connection::class.java)
+  val mock: Connection = mock()
 
   override val displayName: String = "test-connection"
 
   override var isActive: Boolean = false
     private set
 
-  override fun prepare(listener: ConnectionListener?) {
+  override fun prepare(listener: ConnectionListener) {
     currListener = listener
-    mockConnection.prepare(listener)
+    mock.prepare(listener)
   }
 
   override fun release() {
     handlerItems = emptyList()
   }
 
-  override fun send(message: Any?) {
-    mockConnection.send(message)
+  override fun send(message: Any) {
+    mock.send(message)
   }
 
   /* -- notify :begin -- */

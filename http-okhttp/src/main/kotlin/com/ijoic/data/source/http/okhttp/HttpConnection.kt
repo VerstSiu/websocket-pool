@@ -53,8 +53,7 @@ class HttpConnection(
     httpCall = null
   }
 
-  override fun prepare(listener: ConnectionListener?) {
-    listener ?: return
+  override fun prepare(listener: ConnectionListener) {
     stateListener = listener
     val oldFailMessage = failMessage
 
@@ -66,8 +65,7 @@ class HttpConnection(
     }
   }
 
-  override fun send(message: Any?) {
-    message ?: return
+  override fun send(message: Any) {
     failMessage = null
     context.io { doSendMessage(message) }
   }
