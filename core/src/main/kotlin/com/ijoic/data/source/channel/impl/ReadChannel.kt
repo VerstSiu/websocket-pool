@@ -17,7 +17,7 @@ class ReadChannel(
   private val editLock = Object()
 
   init {
-    pool.requestConnections(1)
+    prepareChannel()
   }
 
   private val connectionListener = object: ConnectionPool.ConnectionChangedListener {
@@ -34,6 +34,20 @@ class ReadChannel(
           bindConnection = null
           connection.removeMessageHandler(handler)
         }
+      }
+    }
+  }
+
+  private fun prepareChannel() {
+    synchronized(editLock) {
+      val connection = pool.getActiveConnections(1).firstOrNull()
+
+      if (connection == null) {
+        pool.addConnectionChangeListener(connectionListener)
+        pool.requestConnections(1)
+      } else {
+        bindConnection = connection
+        connection.addMessageHandler(handler)
       }
     }
   }
