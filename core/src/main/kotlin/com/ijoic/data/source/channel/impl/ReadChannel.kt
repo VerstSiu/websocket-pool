@@ -14,8 +14,11 @@ class ReadChannel(
   private val handler: MessageHandler): BaseChannel() {
 
   private var bindConnection: Connection? = null
-
   private val editLock = Object()
+
+  init {
+    pool.requestConnections(1)
+  }
 
   private val connectionListener = object: ConnectionPool.ConnectionChangedListener {
     override fun onConnectionActive(connection: Connection) {
