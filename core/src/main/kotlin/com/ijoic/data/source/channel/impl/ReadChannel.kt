@@ -16,26 +16,28 @@ class ReadChannel(
   private var bindConnection: Connection? = null
   private val editLock = Object()
 
-  init {
-    prepareChannel()
-  }
-
-  private val connectionListener = object: ConnectionPool.ConnectionChangedListener {
-    override fun onConnectionActive(connection: Connection) {
-      synchronized(editLock) {
-        bindConnection = connection
-        connection.addMessageHandler(handler)
+  private val connectionListener by lazy {
+    object: ConnectionPool.ConnectionChangedListener {
+      override fun onConnectionActive(connection: Connection) {
+        synchronized(editLock) {
+          bindConnection = connection
+          connection.addMessageHandler(handler)
+        }
       }
-    }
 
-    override fun onConnectionInactive(connection: Connection) {
-      synchronized(editLock) {
-        if (connection == bindConnection) {
-          bindConnection = null
-          connection.removeMessageHandler(handler)
+      override fun onConnectionInactive(connection: Connection) {
+        synchronized(editLock) {
+          if (connection == bindConnection) {
+            bindConnection = null
+            connection.removeMessageHandler(handler)
+          }
         }
       }
     }
+  }
+
+  init {
+    prepareChannel()
   }
 
   private fun prepareChannel() {
