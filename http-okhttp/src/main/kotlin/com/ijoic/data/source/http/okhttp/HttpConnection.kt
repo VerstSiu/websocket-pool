@@ -24,6 +24,8 @@ import com.ijoic.data.source.impl.BaseConnection
 import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.net.InetSocketAddress
+import java.net.Proxy
 
 /**
  * Http connection
@@ -32,6 +34,7 @@ import okhttp3.Request
  */
 class HttpConnection(
   private val api: String,
+  private val options: Options? = null,
   private val buildUrl: (String, Any) -> String = { baseUrl, _ -> baseUrl },
   private val buildRequest: (String, Any) -> Request = { url, _ -> Request.Builder().url(url).build() },
   private val context: ExecutorContext = DefaultExecutorContext): BaseConnection(context) {
@@ -39,6 +42,8 @@ class HttpConnection(
   private var stateListener: ConnectionListener? = null
   private var failMessage: Any? = null
   private var httpCall: Call? = null
+
+  private val client  by lazy { getClientInstance(options) }
 
   override val displayName: String = api
 
@@ -96,8 +101,28 @@ class HttpConnection(
     }
   }
 
+  /**
+   * Options
+   */
+  data class Options(
+    val proxyHost: String? = null,
+    val proxyPort: Int? = null
+  )
+
   companion object {
-    private val client by lazy { OkHttpClient() }
+    private val defaultOkHttpClient by lazy { OkHttpClient() }
+
+    private fun getClientInstance(options: Options?): OkHttpClient {
+      val proxyHost = options?.proxyHost
+      val proxyPort = options?.proxyPort
+
+      if (proxyHost != null && !proxyHost.isBlank() && proxyPort != null) {
+        return OkHttpClient.Builder()
+          .proxy(Proxy(Proxy.Type.HTTP, InetSocketAddress(proxyHost, proxyPort)))
+          .build()
+      }
+      return defaultOkHttpClient
+    }
 
     private fun Call.checkAndCancel() {
       if (this.isExecuted && !this.isCanceled) {
@@ -105,4 +130,5 @@ class HttpConnection(
       }
     }
   }
+
 }
