@@ -193,7 +193,6 @@ class ConnectionPool(
       connectionFactory.returnObject(connection)
     }
 
-    println("!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     when {
       retryBusy -> {
         ++retryCount
