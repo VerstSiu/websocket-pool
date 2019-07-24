@@ -24,6 +24,7 @@ import com.ijoic.data.source.impl.BaseConnection
 import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Proxy
 
@@ -35,13 +36,12 @@ import java.net.Proxy
 class HttpConnection(
   private val api: String,
   private val options: Options? = null,
-  private val buildUrl: (String, Any) -> String = { baseUrl, _ -> baseUrl },
-  private val buildRequest: (String, Any) -> Request = { url, _ -> Request.Builder().url(url).build() },
+  private val buildRequest: () -> Request = { Request.Builder().url(api).build() },
   private val context: ExecutorContext = DefaultExecutorContext): BaseConnection(context) {
 
   private var stateListener: ConnectionListener? = null
-  private var failMessage: Any? = null
   private var httpCall: Call? = null
+  private var cacheResponse: String? = null
 
   private val client  by lazy { getClientInstance(options) }
 
@@ -52,7 +52,6 @@ class HttpConnection(
 
   override fun onRelease() {
     stateListener = null
-    failMessage = null
     isActive = false
     httpCall?.checkAndCancel()
     httpCall = null
@@ -60,26 +59,55 @@ class HttpConnection(
 
   override fun prepare(listener: ConnectionListener) {
     stateListener = listener
-    val oldFailMessage = failMessage
-
-    if (oldFailMessage != null) {
-      send(oldFailMessage)
-    } else {
-      isActive = true
-      listener.onConnectionComplete()
-    }
+    context.io { doPrepareRequest(listener) }
   }
 
   override fun send(message: Any) {
-    failMessage = null
-    context.io { doSendMessage(message) }
+    context.io { doSendRequest() }
   }
 
-  private fun doSendMessage(message: Any) {
+  private fun doPrepareRequest(listener: ConnectionListener) {
     var httpCall: Call? = null
 
     try {
-      val request = buildRequest(buildUrl(api, message), message)
+      val request = buildRequest()
+
+      httpCall = client.newCall(request)
+      this.httpCall = httpCall
+
+      val response = httpCall.execute()
+      val responseText = response.body()?.string()
+      this.httpCall = null
+
+      if (responseText != null) {
+        cacheResponse = responseText
+        isActive = true
+        listener.onConnectionComplete()
+      } else {
+        isActive = false
+        listener.onConnectionFailure(IOException("couldn't get response content"))
+      }
+
+    } catch (t: Throwable) {
+      if (this.httpCall == httpCall) {
+        isActive = false
+        stateListener?.onConnectionFailure(t)
+      }
+    }
+  }
+
+  private fun doSendRequest() {
+    val cacheResponse = this.cacheResponse
+    this.cacheResponse = null
+
+    if (cacheResponse != null) {
+      dispatchReceivedMessage(cacheResponse)
+      return
+    }
+    var httpCall: Call? = null
+
+    try {
+      val request = buildRequest()
 
       httpCall = client.newCall(request)
       this.httpCall = httpCall
@@ -90,12 +118,14 @@ class HttpConnection(
 
       if (responseText != null) {
         dispatchReceivedMessage(responseText)
+      } else {
+        isActive = false
+        stateListener?.onConnectionFailure(IOException("couldn't get response content"))
       }
 
     } catch (t: Throwable) {
       if (this.httpCall == httpCall) {
         isActive = false
-        failMessage = message
         stateListener?.onConnectionFailure(t)
       }
     }
