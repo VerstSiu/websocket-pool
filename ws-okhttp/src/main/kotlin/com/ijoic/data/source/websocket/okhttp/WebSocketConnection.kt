@@ -83,6 +83,7 @@ class WebSocketConnection(
         isActive = true
         pingManager.onConnectionComplete()
         listener.onConnectionComplete()
+        println("[${options.url}] connection complete!!")
       }
 
       override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
@@ -92,10 +93,12 @@ class WebSocketConnection(
         isActive = false
         pingManager.onConnectionFailure(t)
         listener.onConnectionFailure(t)
+        println("[${options.url}] connection failed!! ${t.message}")
       }
 
       override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
         webSocket.close(1000, "server closed connection")
+        println("[${options.url}] connection closed!!")
       }
 
       override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
@@ -105,6 +108,7 @@ class WebSocketConnection(
         isActive = false
         pingManager.onConnectionClosed(reason, null)
         listener.onConnectionClosed(reason, null)
+        println("[${options.url}] connection closed!! $reason")
       }
 
       override fun onMessage(webSocket: WebSocket, text: String) {
