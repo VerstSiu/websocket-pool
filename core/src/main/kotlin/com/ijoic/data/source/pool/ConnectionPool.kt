@@ -86,7 +86,7 @@ class ConnectionPool(
   }
 
   private fun onRequestConnections(size: Int) {
-    logger.trace("$this request connections: thread - ${Thread.currentThread()}, size - $size")
+    println("$this request connections: thread - ${Thread.currentThread()}, size - $size")
 
     if (retryBusy) {
       val oldRequestSize = metrics.requestSize + 1
@@ -95,7 +95,7 @@ class ConnectionPool(
         metrics.requestSize = size - 1
       }
     } else {
-      logger.trace("$this manager - $prepareManager, old request size - ${prepareManager.requestSize}")
+      println("$this manager - $prepareManager, old request size - ${prepareManager.requestSize}")
       prepareManager.requestConnections(size)
       metrics.requestSize = prepareManager.requestSize
     }
@@ -110,7 +110,7 @@ class ConnectionPool(
     val prepareActiveId = this.activeId
     val connectionId = this.connectionId++
     val taskId = "${connection.displayName} - $connectionId"
-    logger.trace("[$taskId] prepare connection")
+    println("[$taskId] prepare connection")
 
     if (!activePrepared) {
       activePrepared = true
@@ -119,7 +119,7 @@ class ConnectionPool(
     stateListeners.forEach { it.onConnectionBegin(connectionId) }
     connection.prepare(object : ConnectionListener {
       override fun onConnectionComplete() {
-        logger.trace("[$taskId] connection complete")
+        println("[$taskId] connection complete")
 
         if (prepareActiveId != activeId) {
           return
@@ -148,7 +148,7 @@ class ConnectionPool(
       }
 
       override fun onConnectionClosed(message: String?, error: Throwable?) {
-        logger.trace("[$taskId] connection closed - $message", error)
+        logger.error("[$taskId] connection closed - $message", error)
 
         if (prepareActiveId != activeId) {
           return
@@ -164,6 +164,7 @@ class ConnectionPool(
   }
 
   private fun onChildConnectionActive(connection: Connection) {
+    println("child connection active!!")
     if (prepareConnections.remove(connection)) {
       --metrics.requestSize
       ++metrics.activeSize
@@ -226,7 +227,7 @@ class ConnectionPool(
     if (delayMs <= 0) {
       onRetryConnection()
     } else {
-      logger.trace("schedule retry $retryCount after $delayMs ms")
+      println("schedule retry $retryCount after $delayMs ms")
       retryTask = context.scheduleDelay(delayMs) {
         syncEdit { onRetryConnection() }
       }
