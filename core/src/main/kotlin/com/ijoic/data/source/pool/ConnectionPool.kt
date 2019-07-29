@@ -135,14 +135,14 @@ class ConnectionPool(
         logger.error("[$taskId] connection failed", error)
 
         if (prepareActiveId != activeId) {
-          logger.debug("active id not matched")
+          println("active id not matched")
           return
         }
         if (activeConnectionSize == 1) {
-          logger.debug("notify connection inactive")
+          println("notify connection inactive")
           stateListeners.forEach { it.onConnectionInactive() }
         }
-        logger.debug("notify connection failed")
+        println("notify connection failed")
         stateListeners.forEach { it.onConnectionFailed(connectionId, error) }
         syncEdit { onChildConnectionInactive(connection) }
       }
@@ -182,7 +182,7 @@ class ConnectionPool(
   }
 
   private fun onChildConnectionInactive(connection: Connection) {
-    logger.debug("release connection")
+    println("release connection")
     connection.release()
     var isReturnRequired = false
 
@@ -203,7 +203,7 @@ class ConnectionPool(
     when {
       retryBusy -> {
         ++retryCount
-        logger.debug("schedule retry connection")
+        println("schedule retry connection")
         scheduleRetryConnection()
       }
       !activeConnections.isEmpty() -> {
@@ -211,11 +211,11 @@ class ConnectionPool(
       }
       prepareManager.requestSize <= 0 && metrics.requestSize > 0 -> {
         retryBusy = true
-        logger.debug("schedule retry connection")
+        println("schedule retry connection")
         scheduleRetryConnection()
       }
     }
-    logger.debug("notify connection inactive")
+    println("notify connection inactive")
     notifyConnectionInactive(connection)
   }
 
