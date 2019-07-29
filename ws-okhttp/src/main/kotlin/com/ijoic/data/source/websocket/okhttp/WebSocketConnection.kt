@@ -62,8 +62,7 @@ class WebSocketConnection(
 
   private var refActiveListener: WeakReference<ConnectionListener>? = null
 
-  override fun prepare(listener: ConnectionListener?) {
-    listener ?: return
+  override fun prepare(listener: ConnectionListener) {
     if (isActive || prepareSocket != null || activeSocket != null) {
       return
     }
@@ -138,8 +137,7 @@ class WebSocketConnection(
     })
   }
 
-  override fun send(message: Any?) {
-    message ?: return
+  override fun send(message: Any) {
     val socket = activeSocket
 
     if (!isActive || socket == null) {

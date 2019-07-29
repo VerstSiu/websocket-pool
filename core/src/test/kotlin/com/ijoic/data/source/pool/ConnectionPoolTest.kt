@@ -1,10 +1,11 @@
 package com.ijoic.data.source.pool
 
 import com.ijoic.data.source.Connection
-import com.ijoic.data.source.ConnectionListener
+import com.nhaarman.mockito_kotlin.any
+import com.nhaarman.mockito_kotlin.mock
+import com.nhaarman.mockito_kotlin.times
+import com.nhaarman.mockito_kotlin.verify
 import org.junit.Test
-import org.mockito.Matchers
-import org.mockito.Mockito.*
 import java.time.Duration
 
 /**
@@ -13,7 +14,7 @@ import java.time.Duration
 class ConnectionPoolTest {
   @Test
   fun testRequestConnectionsSimple() {
-    val connection = mock(Connection::class.java)
+    val connection: Connection = mock()
     val pool = ConnectionPool(
       PoolConfig(
         limitPrepareInterval = Duration.ofSeconds(10)
@@ -21,9 +22,9 @@ class ConnectionPoolTest {
     ) { connection }
 
     pool.requestConnections(1)
-    verify(connection, times(1)).prepare(Matchers.any(ConnectionListener::class.java))
+    verify(connection, times(1)).prepare(any())
 
     pool.requestConnections(1)
-    verify(connection, times(1)).prepare(Matchers.any(ConnectionListener::class.java))
+    verify(connection, times(1)).prepare(any())
   }
 }

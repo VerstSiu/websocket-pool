@@ -41,7 +41,7 @@ class SubscribeChannel<DATA, MSG>(
   private val mergeGroupSize: Int = -1,
   private val context: ExecutorContext = DefaultExecutorContext,
   mergeDuration: Duration = Duration.ofMillis(20),
-  retrySubscribeDuration: Duration = Duration.ZERO): BaseChannel() {
+  retrySubscribeDuration: Duration = Duration.ofSeconds(2)): BaseChannel() {
 
   private val activeMessages = mutableListOf<DATA>()
   private var bindConnection: Connection? = null
@@ -126,6 +126,7 @@ class SubscribeChannel<DATA, MSG>(
   private fun dispatchSubscribe(items: List<SubscribeInfo<DATA>>) {
     val subscribeItems = mutableSetOf<DATA>()
     val unsubscribeItems = mutableSetOf<DATA>()
+    val refreshItems = mutableSetOf<DATA>()
 
     synchronized(editLock) {
       items.forEach {
@@ -136,19 +137,37 @@ class SubscribeChannel<DATA, MSG>(
             Operation.SUBSCRIBE -> {
               if (!activeMessages.contains(data)) {
                 activeMessages.add(data)
-                subscribeItems.add(data)
-                unsubscribeItems.remove(data)
+
+                if (!refreshItems.contains(data)) {
+                  if (unsubscribeItems.contains(data)) {
+                    subscribeItems.remove(data)
+                    unsubscribeItems.remove(data)
+                    refreshItems.add(data)
+                  } else if (!subscribeItems.contains(data)) {
+                    subscribeItems.add(data)
+                  }
+                }
               }
             }
             Operation.UNSUBSCRIBE -> {
               if (activeMessages.contains(data)) {
                 activeMessages.remove(data)
+
+                refreshItems.remove(data)
                 subscribeItems.remove(data)
-                unsubscribeItems.add(data)
+
+                if (!unsubscribeItems.contains(data)) {
+                  unsubscribeItems.add(data)
+                }
               }
             }
           }
         }
+      }
+
+      refreshItems.forEach {
+        unsubscribeItems.add(it)
+        subscribeItems.add(it)
       }
 
       val sendRepeatItems = items
@@ -274,7 +293,7 @@ class SubscribeChannel<DATA, MSG>(
       val items = failedItems.toList()
       failedItems.clear()
 
-      if (!items.isEmpty()) {
+      if (items.isNotEmpty()) {
         sendSubscribeWithExistConnection(Operation.SUBSCRIBE, items)
       }
     }

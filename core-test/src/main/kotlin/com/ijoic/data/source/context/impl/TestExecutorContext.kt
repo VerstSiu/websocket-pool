@@ -55,13 +55,13 @@ class TestExecutorContext: ExecutorContext {
   }
 
   override fun scheduleDelay(delayMs: Long, runnable: () -> Unit): Future<*> {
-    val task = FutureTask<Unit>(runnable)
+    val task = FutureTask(runnable)
     scheduleList.add(ScheduleItem(lastCurrTime + delayMs, 0L, runnable, task, repeat = false))
     return task
   }
 
   override fun scheduleAtFixRate(delayMs: Long, periodMs: Long, runnable: () -> Unit): Future<*> {
-    val task = FutureTask<Unit>(runnable)
+    val task = FutureTask(runnable)
     scheduleList.add(ScheduleItem(lastCurrTime + delayMs, periodMs, runnable, task, repeat = true))
     return task
   }
@@ -147,7 +147,7 @@ class TestExecutorContext: ExecutorContext {
    * Execute next io runnable
    */
   fun nextIO(): Boolean {
-    if (!ioList.isEmpty()) {
+    if (ioList.isNotEmpty()) {
       ioList.removeAt(0).invoke()
       return true
     }

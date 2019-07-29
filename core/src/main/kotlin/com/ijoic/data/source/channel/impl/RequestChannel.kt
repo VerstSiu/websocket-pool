@@ -27,12 +27,12 @@ import com.ijoic.data.source.pool.ConnectionPool
  */
 class RequestChannel(
   pool: ConnectionPool,
-  handler: MessageHandler): MessageChannel<Unit>(pool, handler) {
+  handler: MessageHandler): MessageChannel<String>(pool, handler) {
 
   /**
    * Send request
    */
   fun sendRequest() {
-    super.send(Unit)
+    super.send("")
   }
 }

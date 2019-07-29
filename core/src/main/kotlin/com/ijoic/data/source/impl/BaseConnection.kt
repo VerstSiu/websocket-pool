@@ -22,6 +22,8 @@ import com.ijoic.data.source.context.ExecutorContext
 import com.ijoic.data.source.handler.MessageHandler
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.message.SimpleMessage
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 /**
  * Base connection
@@ -60,8 +62,8 @@ abstract class BaseConnection(private val context: ExecutorContext): Connection 
   protected fun dispatchReceivedMessage(message: Any) {
     val receiveTime = context.getCurrentTime()
 
-    context.io {
-      val oldHandlerItems = this.handlerItems
+    getExecutorService().execute {
+      val oldHandlerItems = handlerItems
 
       if (oldHandlerItems.isEmpty()) {
         connectionLogger.debug {
@@ -70,7 +72,7 @@ abstract class BaseConnection(private val context: ExecutorContext): Connection 
       } else {
         var msgDispatched = false
 
-        for (handler in handlerItems) {
+        for (handler in oldHandlerItems) {
           if (handler.dispatchMessage(receiveTime, message)) {
             msgDispatched = true
             break
@@ -87,10 +89,34 @@ abstract class BaseConnection(private val context: ExecutorContext): Connection 
 
   override fun release() {
     handlerItems = emptyList()
+    releaseExecutorService()
     onRelease()
   }
 
   protected abstract fun onRelease()
+
+  /* -- executors :begin -- */
+
+  private var executors: ExecutorService? = null
+
+  private fun getExecutorService(): ExecutorService {
+    val oldService = executors
+
+    if (oldService != null) {
+      return oldService
+    }
+    val service = Executors.newFixedThreadPool(1)
+
+    executors = service
+    return service
+  }
+
+  private fun releaseExecutorService() {
+    executors?.shutdown()
+    executors = null
+  }
+
+  /* -- executors :end -- */
 
   companion object {
     private val connectionLogger = LogManager.getLogger(Connection::class.java)

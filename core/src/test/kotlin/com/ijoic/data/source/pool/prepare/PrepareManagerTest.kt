@@ -3,8 +3,10 @@ package com.ijoic.data.source.pool.prepare
 import com.ijoic.data.source.context.impl.DefaultExecutorContext
 import com.ijoic.data.source.pool.prepare.impl.LimitIntervalPrepareManager
 import com.ijoic.data.source.pool.prepare.impl.LimitSizePrepareManager
+import com.nhaarman.mockito_kotlin.mock
+import com.nhaarman.mockito_kotlin.times
+import com.nhaarman.mockito_kotlin.verify
 import org.junit.Test
-import org.mockito.Mockito.*
 
 /**
  * Prepare manager test
@@ -12,7 +14,7 @@ import org.mockito.Mockito.*
 class PrepareManagerTest {
   @Test
   fun testLimitSizeSimple() {
-    val onPrepare = mock(Function0::class.java) as () -> Unit
+    val onPrepare: () -> Unit = mock()
     val manager: PrepareManager = LimitSizePrepareManager(10, onPrepare)
 
     manager.requestConnections(1)
@@ -34,7 +36,7 @@ class PrepareManagerTest {
 
   @Test
   fun testLimitIntervalSimple() {
-    val onPrepare = mock(Function0::class.java) as () -> Unit
+    val onPrepare: () -> Unit = mock()
     val manager: PrepareManager = LimitIntervalPrepareManager(2000, onPrepare, DefaultExecutorContext)
 
     manager.requestConnections(1)

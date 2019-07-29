@@ -181,14 +181,19 @@ class ConnectionPool(
 
   private fun onChildConnectionInactive(connection: Connection) {
     connection.release()
+    var isReturnRequired = false
 
     if (activeConnections.remove(connection)) {
       --metrics.activeSize
       ++metrics.requestSize
-      connectionFactory.returnObject(connection)
+      isReturnRequired = true
     }
     if (prepareConnections.remove(connection)) {
       prepareManager.notifyPrepareComplete()
+      isReturnRequired = true
+    }
+
+    if (isReturnRequired) {
       connectionFactory.returnObject(connection)
     }
 
